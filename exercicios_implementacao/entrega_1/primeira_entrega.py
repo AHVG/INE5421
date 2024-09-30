@@ -134,10 +134,6 @@ class AF:
             next_states = []
             for symbol in self.symbols:
                 next_state = self.transition(current_state, symbol)
-                if next_state not in next_states:
-                    next_states.append(next_state)
-
-            for next_state in next_states:
                 if next_state not in reachable_states:
                     reachable_states.append(next_state)
 
@@ -170,7 +166,7 @@ class AF:
             new_final_states.remove(dead_state)
 
         # Remover estados equivalentes
-        
+
 
         return AF(new_states, new_symbols, new_table, new_initial_state, new_final_states)
 
