@@ -14,6 +14,7 @@ Formato da saída:   <<automato finito determinístico><automato finito determin
 
 DICA: O programa avalia somente o que está dentro das tags <>.
 """
+import copy
 
 from sys import argv
 
@@ -21,7 +22,7 @@ from sys import argv
 class AF:
 
     def __init__(self, states, symbols, table, initial_state, final_states):
-        self.states: str = states
+        self.states: set[str] = states
         self.symbols: set[str] = symbols
         self.table: dict[str, dict[str, set[str]]] = table
         self.initial_state: str = initial_state
@@ -71,7 +72,7 @@ class AF:
             # Se ja existir na tabela, não tem razão de computar novamente
             if state in table:
                 continue
-            
+
             # Adiciona na tabela
             table[state] = {}
 
@@ -103,16 +104,77 @@ class AF:
                 s = "".join(sorted(list(state)))
                 if s not in new_table:
                     new_table[s] = {}
-                    new_table[s][symbol] = next_state
+                    new_table[s][symbol] = "".join(sorted(list(next_state)))
                 else:
-                    new_table[s][symbol] = next_state
+                    new_table[s][symbol] = "".join(sorted(list(next_state)))
 
                 for s in state:
                     if s in self.final_states:
-                        final_states.add(state)
+                        final_states.add("".join(sorted(list(state))))
                         break
 
-        return AF(new_table.keys(), symbols, new_table, initial_state, final_states)
+        return AF(set(new_table.keys()), symbols, new_table, initial_state, final_states)
+
+    def minimize(self):
+        # Remover estados inalcançaveis
+        new_states = self.states.copy()
+        new_symbols = self.symbols.copy()
+        new_table = copy.deepcopy(self.table)
+        new_initial_state = self.initial_state
+        new_final_states = self.final_states.copy()
+
+        reachable_states = [self.initial_state]
+        i = -1
+        while reachable_states:
+            i += 1
+            if len(reachable_states) < i + 1:
+                break
+
+            current_state = reachable_states[i]
+            next_states = []
+            for symbol in self.symbols:
+                next_state = self.transition(current_state, symbol)
+                if next_state not in next_states:
+                    next_states.append(next_state)
+
+            for next_state in next_states:
+                if next_state not in reachable_states:
+                    reachable_states.append(next_state)
+
+        unreachable_states = list(set(new_states) - set(reachable_states))
+
+        for unreachable_state in unreachable_states:
+            new_table.pop(unreachable_state)
+            new_states.remove(unreachable_state)
+            new_final_states.remove(unreachable_state)
+
+        # remover estados mortos
+        final_states = list(new_final_states)
+        i = -1
+        while final_states:
+            i += 1
+            if len(final_states) < i + 1:
+                break
+
+            final_state = final_states[i]
+
+            for state, value in new_table.items():
+                for _, next_state in value.items():
+                    if next_state == final_state and state not in final_states:
+                        final_states.append(state)
+        
+        dead_states = list(set(new_states) - set(final_states))
+        for dead_state in dead_states:
+            new_table.pop(dead_state)
+            new_states.remove(dead_state)
+            new_final_states.remove(dead_state)
+
+        # Remover estados equivalentes
+        
+
+        return AF(new_states, new_symbols, new_table, new_initial_state, new_final_states)
+
+
 
     def __str__(self):
         # <<automato finito determinístico><automato finito determinístico mínimo>>
@@ -184,8 +246,10 @@ def main():
     vpl_input = argv[1]
     infos = process_vpl_input(vpl_input)
     af = AF(infos["states"], infos["alphabet"], infos["transition_table"], infos["initial_state"], infos["final_states"])
-    print(af.determine())
-
+    af = af.determine()
+    print(af)
+    af = af.minimize()
+    print(af)
 
 
 if __name__ == "__main__":
