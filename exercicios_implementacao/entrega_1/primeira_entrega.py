@@ -211,17 +211,19 @@ class AF:
         
         temp_table = {}
         for states in eq_class:
-            temp_table[tuple(states)] = {}
-            for state in states:    
-                for symbol in new_symbols:
-                    next_state = self.transition(state, symbol)
-                    if symbol not in temp_table[tuple(states)].keys():
-                        temp_table[tuple(states)][symbol] = []                        
-                    temp_table[tuple(states)][symbol].append(next_state)
-
             format_state = "".join(sorted(list(set(list("".join(states))))))
-            temp_table[format_state] = temp_table[tuple(states)].copy()
-            temp_table.pop(tuple(states))
+            print(states, format_state)
+            temp_table[format_state] = {}
+            for state in states:
+                for symbol in new_symbols:
+                    # TODO: AQUI TA O ERRO
+                    next_state = self.transition(state, symbol)
+                    print(state, symbol, next_state)
+                    if symbol not in temp_table[format_state].keys():
+                        temp_table[format_state][symbol] = []
+                    
+                    if next_state:
+                        temp_table[format_state][symbol].append(next_state)
             
             for state, value in temp_table.items():        
                 for symbol, next_state in value.items():
@@ -240,7 +242,7 @@ class AF:
             if new_initial_state in e_class:
                 temp_initial_state = "".join(sorted(list(set(list("".join(e_class))))))
 
-        return AF(new_states, new_symbols, new_table, temp_initial_state, set(temp_final_states))
+        return AF(new_states, new_symbols, temp_table, temp_initial_state, set(temp_final_states))
 
 
 
@@ -310,8 +312,11 @@ def main():
     # Entrada:        4;P;{S};{0,1};P,0,P;P,0,Q;P,1,P;Q,0,R;Q,1,R;R,0,S;S,0,S;S,1,S
     # Saída:          8;{P};{{PQS},{PRS},{PS},{PQRS}};{1,0};{P},1,{P};{P},0,{QP};{PQ},1,{RP};{PQ},0,{RQP};{PQR},1,{RP};{PQR},0,{RQSP};{PQRS},1,{RSP};{PQRS},0,{SRQP};{PRS},1,{SP};{PRS},0,{SQP};{PQS},1,{RSP};{PQS},0,{RQSP};{PS},1,{SP};{PS},0,{SQP};{PR},1,{P};{PR},0,{SQP}
     # Saída esperada: 8;{P};{{PQRS},{PQS},{PRS},{PS}};{0,1};{P},0,{PQ};{P},1,{P};{PQ},0,{PQR};{PQ},1,{PR};{PQR},0,{PQRS};{PQR},1,{PR};{PQRS},0,{PQRS};{PQRS},1,{PRS};{PQS},0,{PQRS};{PQS},1,{PRS};{PR},0,{PQS};{PR},1,{P};{PRS},0,{PQS};{PRS},1,{PS};{PS},0,{PQS};{PS},1,{PS}
-    # Saída:          5;{P};{{PQRS}};{0,1};{P},0,{PQ};{P},1,{P};{PQ},0,{PQR};{PQ},1,{PR};{PR},0,{PQS};{PR},1,{P};{PQS},0,{PQRS};{PQS},1,{PRS};{PRS},0,{PQS};{PRS},1,{PS};{PS},0,{PQS};{PS},1,{PS};{PQRS},0,{PQRS};{PQRS},1,{PRS};{PQR},0,{PQRS};{PQR},1,{PR}
+    # Saída:          5;{P};{{PQRS}};{0,1};{PQRS},0,{PQRS};{PQRS},1,{PRS};{PQR},0,{PQRS};{PQR},1,{PR};{PR},0,{PQS};{PR},1,{P};{P},0,{PQ};{P},1,{P};{PQ},0,{PQR};{PQ},1,{PR}
     # Saída esperada: 5;{P};{{PQRS}};{0,1};{P},0,{PQ};{P},1,{P};{PQ},0,{PQR};{PQ},1,{PR};{PQR},0,{PQRS};{PQR},1,{PR};{PQRS},0,{PQRS};{PQRS},1,{PQRS};{PR},0,{PQRS};{PR},1,{P}
+
+    # {PQRS},1,{PRS};{PR},0,{PQS};
+    # {PQRS},1,{PQRS};{PR},0,{PQRS};
 
     vpl_input = argv[1]
     infos = process_vpl_input(vpl_input)
