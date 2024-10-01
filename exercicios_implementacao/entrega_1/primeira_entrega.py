@@ -22,13 +22,13 @@ from sys import argv
 class AF:
 
     def __init__(self, states, symbols, table, initial_state, final_states):
-        self.states: set[str] = states
-        self.symbols: set[str] = symbols
-        self.table: dict[str, dict[str, set[str]]] = table
+        self.states = states
+        self.symbols = symbols
+        self.table: dict[str, dict[str]] = table
         self.initial_state: str = initial_state
-        self.final_states: set[str] = final_states
+        self.final_states = final_states
 
-    def transition(self, state: str, symbol: str) -> set[str] | None:
+    def transition(self, state: str, symbol: str):
         if state in self.table:
             transition = self.table[state]
 
@@ -37,7 +37,7 @@ class AF:
 
         return None
 
-    def empty_transition(self, state: str) -> set[str]:
+    def empty_transition(self, state: str):
         states = [state]
         stack_states = []
 
@@ -131,7 +131,6 @@ class AF:
                 break
 
             current_state = reachable_states[i]
-            next_states = []
             for symbol in self.symbols:
                 next_state = self.transition(current_state, symbol)
                 if next_state not in reachable_states:
@@ -158,7 +157,7 @@ class AF:
                 for _, next_state in value.items():
                     if next_state == final_state and state not in final_states:
                         final_states.append(state)
-        
+
         dead_states = list(set(new_states) - set(final_states))
         for dead_state in dead_states:
             new_table.pop(dead_state)
@@ -166,9 +165,82 @@ class AF:
             new_final_states.remove(dead_state)
 
         # Remover estados equivalentes
+        final = list(new_final_states.copy())
+        others = list(new_states - new_final_states)
+        eq_class = [final[:], others[:]]
 
+        changed = False
+        while True:
+            state_to_eq_class = {}
+            for c in eq_class:
+                for s in c:
+                    state_to_eq_class[s] = []
+                    for symbol in new_symbols:
+                        state = self.transition(s, symbol)
+                        
+                        for i, target in enumerate(eq_class):
+                            if state in target:
+                                state_to_eq_class[s].append(i)
+        
+            # Dicionários para armazenar os grupos
+            final_grupos = {}
+            others_grupos = {}
 
-        return AF(new_states, new_symbols, new_table, new_initial_state, new_final_states)
+            # Função auxiliar para agrupar termos com o mesmo índice
+            def agrupar_termos(grupos, termo, indices):
+                indice_tuple = tuple(indices)
+                if indice_tuple not in grupos:
+                    grupos[indice_tuple] = []
+                grupos[indice_tuple].append(termo)
+            
+            # Percorrendo os termos e agrupando com base no conjunto inicial
+            for termo, indices in state_to_eq_class.items():
+                if termo in final:
+                    agrupar_termos(final_grupos, termo, indices)
+                elif termo in others:
+                    agrupar_termos(others_grupos, termo, indices)
+
+            new_eq_class = [*final_grupos.values(), *others_grupos.values()]
+
+            if len(new_eq_class) == len(eq_class):
+                break
+            
+            eq_class = new_eq_class[:]
+
+        print(eq_class)
+        
+        temp_table = {}
+        for states in eq_class:
+            temp_table[tuple(states)] = {}
+            for state in states:    
+                for symbol in new_symbols:
+                    next_state = self.transition(state, symbol)
+                    if symbol not in temp_table[tuple(states)].keys():
+                        temp_table[tuple(states)][symbol] = []                        
+                    temp_table[tuple(states)][symbol].append(next_state)
+
+            format_state = "".join(sorted(list(set(list("".join(states))))))
+            temp_table[format_state] = temp_table[tuple(states)].copy()
+            temp_table.pop(tuple(states))
+            
+            for state, value in temp_table.items():        
+                for symbol, next_state in value.items():
+                    temp_table[state][symbol] = "".join(sorted(list(set(list("".join(next_state))))))
+
+        new_states = temp_table.keys()
+        temp_final_states = []
+        temp_initial_state = ""
+        for state in new_states:
+            for f_state in new_final_states:
+                if f_state in state:
+                    temp_final_states.append(state)
+        
+        
+        for e_class in eq_class:
+            if new_initial_state in e_class:
+                temp_initial_state = "".join(sorted(list(set(list("".join(e_class))))))
+
+        return AF(new_states, new_symbols, new_table, temp_initial_state, set(temp_final_states))
 
 
 
@@ -238,6 +310,8 @@ def main():
     # Entrada:        4;P;{S};{0,1};P,0,P;P,0,Q;P,1,P;Q,0,R;Q,1,R;R,0,S;S,0,S;S,1,S
     # Saída:          8;{P};{{PQS},{PRS},{PS},{PQRS}};{1,0};{P},1,{P};{P},0,{QP};{PQ},1,{RP};{PQ},0,{RQP};{PQR},1,{RP};{PQR},0,{RQSP};{PQRS},1,{RSP};{PQRS},0,{SRQP};{PRS},1,{SP};{PRS},0,{SQP};{PQS},1,{RSP};{PQS},0,{RQSP};{PS},1,{SP};{PS},0,{SQP};{PR},1,{P};{PR},0,{SQP}
     # Saída esperada: 8;{P};{{PQRS},{PQS},{PRS},{PS}};{0,1};{P},0,{PQ};{P},1,{P};{PQ},0,{PQR};{PQ},1,{PR};{PQR},0,{PQRS};{PQR},1,{PR};{PQRS},0,{PQRS};{PQRS},1,{PRS};{PQS},0,{PQRS};{PQS},1,{PRS};{PR},0,{PQS};{PR},1,{P};{PRS},0,{PQS};{PRS},1,{PS};{PS},0,{PQS};{PS},1,{PS}
+    # Saída:          5;{P};{{PQRS}};{0,1};{P},0,{PQ};{P},1,{P};{PQ},0,{PQR};{PQ},1,{PR};{PR},0,{PQS};{PR},1,{P};{PQS},0,{PQRS};{PQS},1,{PRS};{PRS},0,{PQS};{PRS},1,{PS};{PS},0,{PQS};{PS},1,{PS};{PQRS},0,{PQRS};{PQRS},1,{PRS};{PQR},0,{PQRS};{PQR},1,{PR}
+    # Saída esperada: 5;{P};{{PQRS}};{0,1};{P},0,{PQ};{P},1,{P};{PQ},0,{PQR};{PQ},1,{PR};{PQR},0,{PQRS};{PQR},1,{PR};{PQRS},0,{PQRS};{PQRS},1,{PQRS};{PR},0,{PQRS};{PR},1,{P}
 
     vpl_input = argv[1]
     infos = process_vpl_input(vpl_input)
