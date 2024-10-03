@@ -26,6 +26,9 @@ class FiniteAutomaton:
         self.alphabet = alphabet
         self.transitions = transitions
 
+    def transition(self, state, symbol):
+        return self.transitions.get((state, symbol), None)
+
     def __str__(self) -> str:
         def format_state(state):
             return "{" + "".join(sorted(list(state))) + "}"
@@ -40,15 +43,73 @@ class FiniteAutomaton:
 
 
 class DeterministicFiniteAutomaton(FiniteAutomaton):
+
     def minimize(self):
-        pass
+        new_states = [self.initial_state]
+        new_initial_state = self.initial_state
+        new_final_states = set()
+        new_alphabet = self.alphabet
+        new_transitions = self.transitions.copy()
+
+        # Remover estados inalcancaveis
+        reachable_states = set()
+        new_states = {self.initial_state}
+        
+        while new_states:
+            state = new_states.pop()
+            reachable_states.add(state)
+            
+            for symbol in self.alphabet:
+                next_state = self.transition(state, symbol)
+                if next_state and next_state not in reachable_states:
+                    new_states.add(next_state)
+
+        new_states = reachable_states
+        new_transitions = {k: v for k, v in self.transitions.items() if k[0] in reachable_states}
+        new_final_states = {state for state in self.final_states if state in reachable_states}
+
+        print("Estados inalcancaveis")
+        print(new_states)
+        print(new_initial_state)
+        print(new_final_states)
+        print(new_alphabet)
+        print(new_transitions)
+
+        # Remover estados mortos
+        alive_states = set(self.final_states)
+        changed = True
+
+        while changed:
+            changed = False
+            for (state, symbol), next_state in self.transitions.items():
+                if next_state in alive_states and state not in alive_states:
+                    alive_states.add(state)
+                    changed = True
+
+        new_states = alive_states
+        new_transitions = {k: v for k, v in self.transitions.items() if k[0] in alive_states}
+        new_final_states = {state for state in self.final_states if state in alive_states}
+
+        print("Estados mortos")
+        print(new_states)
+        print(new_initial_state)
+        print(new_final_states)
+        print(new_alphabet)
+        print(new_transitions)
+        
+        # Remover estados equivalentes
+        # TODO
+
+        # print("Estados equivalentes")
+        # print(new_states)
+        # print(new_initial_state)
+        # print(new_final_states)
+        # print(new_alphabet)
+        # print(new_transitions)
+
+        return self
 
 class NonDeterministicFiniteAutomaton(FiniteAutomaton):
-    def transition(self, state, symbol):
-        if (state, symbol) in self.transitions:
-            return self.transitions[(state, symbol)]
-        return None
-
     def epsilon_closure(self, state):
         if isinstance(state, frozenset):
             states = list(state)
@@ -132,8 +193,8 @@ def main():
     states, initial_state, final_states, alphabet, transitions = parse_automaton(vpl_input)
     ndfa = NonDeterministicFiniteAutomaton(states, initial_state, final_states, alphabet, transitions)
     dfa = ndfa.determinize()
-    test = "<5;{P};{{PQRS}};{0,1};{P},0,{PQ};{P},1,{P};{PQ},0,{PQR};{PQ},1,{PR};{PQR},0,{PQRS};{PQR},1,{PR};{PQRS},0,{PQRS};{PQRS},1,{PQRS};{PR},1,{P}>"
-    print(f"<<{dfa}>{test}>")
+    dfa = dfa.minimize()
+    print(f"<<{dfa}>{dfa}>")
     
     # 8;{P};{{PQS},{PRS},{PQRS},{PS}};{1,0};{P},1,{P};{P},0,{PQ};{PQ},1,{PR};{PQ},0,{PQR};{PR},1,{P};{PR},0,{PQS};{PQR},1,{PR};{PQR},0,{PQRS};{PQS},1,{PRS};{PQS},0,{PQRS};{PQRS},1,{PRS};{PQRS},0,{PQRS};{PRS},1,{PS};{PRS},0,{PQS};{PS},1,{PS};{PS},0,{PQS}
     # 8;{P};{{PQRS},{PQS},{PRS},{PS}};{0,1};{P},0,{PQ};{P},1,{P};{PQ},0,{PQR};{PQ},1,{PR};{PQR},0,{PQRS};{PQR},1,{PR};{PQRS},0,{PQRS};{PQRS},1,{PRS};{PQS},0,{PQRS};{PQS},1,{PRS};{PR},0,{PQS};{PR},1,{P};{PRS},0,{PQS};{PRS},1,{PS};{PS},0,{PQS};{PS},1,{PS}
