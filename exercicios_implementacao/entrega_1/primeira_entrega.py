@@ -45,7 +45,6 @@ class FiniteAutomaton:
 class DeterministicFiniteAutomaton(FiniteAutomaton):
 
     def minimize(self):
-        new_states = [self.initial_state]
         new_initial_state = self.initial_state
         new_final_states = set()
         new_alphabet = self.alphabet
@@ -54,11 +53,11 @@ class DeterministicFiniteAutomaton(FiniteAutomaton):
         # Remover estados inalcancaveis
         reachable_states = set()
         new_states = {self.initial_state}
-        
+
         while new_states:
             state = new_states.pop()
             reachable_states.add(state)
-            
+
             for symbol in self.alphabet:
                 next_state = self.transition(state, symbol)
                 if next_state and next_state not in reachable_states:
@@ -68,46 +67,94 @@ class DeterministicFiniteAutomaton(FiniteAutomaton):
         new_transitions = {k: v for k, v in self.transitions.items() if k[0] in reachable_states}
         new_final_states = {state for state in self.final_states if state in reachable_states}
 
-        print("Estados inalcancaveis")
-        print(new_states)
-        print(new_initial_state)
-        print(new_final_states)
-        print(new_alphabet)
-        print(new_transitions)
-
         # Remover estados mortos
-        alive_states = set(self.final_states)
+        alive_states = set(new_final_states)
         changed = True
 
         while changed:
             changed = False
-            for (state, symbol), next_state in self.transitions.items():
+            for (state, symbol), next_state in new_transitions.items():
                 if next_state in alive_states and state not in alive_states:
                     alive_states.add(state)
                     changed = True
 
         new_states = alive_states
-        new_transitions = {k: v for k, v in self.transitions.items() if k[0] in alive_states}
-        new_final_states = {state for state in self.final_states if state in alive_states}
+        new_transitions = {(state, symbol): next_state for (state, symbol), next_state in new_transitions.items() if state in alive_states and next_state in alive_states}
+        new_final_states = {state for state in new_final_states if state in alive_states}
 
-        print("Estados mortos")
-        print(new_states)
-        print(new_initial_state)
-        print(new_final_states)
-        print(new_alphabet)
-        print(new_transitions)
-        
         # Remover estados equivalentes
-        # TODO
+        partition = [new_final_states, new_states - new_final_states]
 
-        # print("Estados equivalentes")
-        # print(new_states)
-        # print(new_initial_state)
-        # print(new_final_states)
-        # print(new_alphabet)
-        # print(new_transitions)
+        while True:
+            new_partition = []
+            for group in partition:
+                partitions = {}
+                for state in group:
+                    key = list({new_transitions.get((state, symbol), None) for symbol in new_alphabet})
 
-        return self
+                    for l, k in enumerate(key):
+                        for j, p in enumerate(partition):
+                            if k in p:
+                                key[l] = j
+
+                    key = tuple(key)
+
+                    if key not in partitions:
+                        partitions[key] = set()
+                    partitions[key].add(state)
+
+                new_partition.extend(partitions.values())
+
+            if len(new_partition) == len(partition):
+                break
+
+            partition = new_partition
+        
+
+        new_partition = [group for group in partition if group]
+        
+        state_for_group = {}
+        for group in new_partition:
+            temp = frozenset(set.union(*[set(s) for s in group]))
+            for state in group:
+                state_for_group[state] = temp
+
+        for group in new_partition:
+            for f in group:
+                if new_initial_state in f:
+                    new_initial_state = frozenset(set.union(*[set(s) for s in group]))
+                    break
+        new_new_transition = {}
+        new_new_states = set()
+        
+        for group in new_partition:
+            new_state = frozenset(set.union(*[set(s) for s in group]))
+            for symbol in new_alphabet:
+                for state in group:
+                    next_state = new_transitions.get((state, symbol), None)
+                    if next_state:
+                        if (new_state, symbol) not in new_new_transition:
+                            new_new_transition[(new_state, symbol)] = set()
+    
+                        if next_state in state_for_group:
+                            new_new_transition[(new_state, symbol)].add(state_for_group[next_state])
+                        else:
+                            new_new_transition[(new_state, symbol)].add(next_state)
+
+                if (new_state, symbol) in new_new_transition:
+                    new_new_transition[(new_state, symbol)] = frozenset(set.union(*[set(s) for s in new_new_transition[(new_state, symbol)]]))
+            new_new_states.add(new_state)
+
+        new_states = new_new_states
+        new_new_final_states = set()
+        for f in new_states:
+            for final_state in new_final_states:
+                if final_state <= f:
+                    new_new_final_states.add(f)
+        new_final_states = new_new_final_states
+        new_transitions = new_new_transition.copy()
+
+        return DeterministicFiniteAutomaton(frozenset(new_states), new_initial_state, frozenset(new_final_states), new_alphabet, new_transitions)
 
 class NonDeterministicFiniteAutomaton(FiniteAutomaton):
     def epsilon_closure(self, state):
@@ -193,11 +240,15 @@ def main():
     states, initial_state, final_states, alphabet, transitions = parse_automaton(vpl_input)
     ndfa = NonDeterministicFiniteAutomaton(states, initial_state, final_states, alphabet, transitions)
     dfa = ndfa.determinize()
-    dfa = dfa.minimize()
-    print(f"<<{dfa}>{dfa}>")
-    
-    # 8;{P};{{PQS},{PRS},{PQRS},{PS}};{1,0};{P},1,{P};{P},0,{PQ};{PQ},1,{PR};{PQ},0,{PQR};{PR},1,{P};{PR},0,{PQS};{PQR},1,{PR};{PQR},0,{PQRS};{PQS},1,{PRS};{PQS},0,{PQRS};{PQRS},1,{PRS};{PQRS},0,{PQRS};{PRS},1,{PS};{PRS},0,{PQS};{PS},1,{PS};{PS},0,{PQS}
-    # 8;{P};{{PQRS},{PQS},{PRS},{PS}};{0,1};{P},0,{PQ};{P},1,{P};{PQ},0,{PQR};{PQ},1,{PR};{PQR},0,{PQRS};{PQR},1,{PR};{PQRS},0,{PQRS};{PQRS},1,{PRS};{PQS},0,{PQRS};{PQS},1,{PRS};{PR},0,{PQS};{PR},1,{P};{PRS},0,{PQS};{PRS},1,{PS};{PS},0,{PQS};{PS},1,{PS}
+    m_dfa = dfa.minimize()
+    print(f"<<{dfa}>><<{m_dfa}>>")
+
+    # Input: "6;S;{S,X};{a,b,c};S,a,A;S,b,A;S,b,C;S,c,C;A,a,M;A,b,B;A,b,X;A,c,D;A,c,X;B,a,A;B,b,A;B,b,C;B,c,C;C,a,E;C,a,X;C,b,B;c,b,X;C,c,M;D,a,A;D,b,A;D,b,C;D,c,M;E,a,M;E,b,A;E,b,C;E,c,C"
+    # meu
+    # {DMX},c,{M};{EMX},c,{C};{EMX},a,{M};{C},c,{M};{A},a,{M}>>
+    # dele
+    # {EMX},c,{C}>>
+
 
 if __name__ == "__main__":
     main()
