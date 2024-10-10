@@ -120,10 +120,9 @@ class DeterministicFiniteAutomaton(FiniteAutomaton):
                 state_for_group[state] = temp
 
         for group in new_partition:
-            for f in group:
-                if new_initial_state in f:
-                    new_initial_state = frozenset(set.union(*[set(s) for s in group]))
-                    break
+            if new_initial_state in group:
+                new_initial_state = frozenset(set.union(*[set(s) for s in group]))
+                break
         new_new_transition = {}
         new_new_states = set()
         
@@ -252,3 +251,14 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+#  Output: <<11;{S};{DMX,BX,EX,EMX,DX,S};{a,b,c};{S},a,{A};{S},b,{AC};{S},c,{C};{A},a,{M};{A},b,{BX};{A},c,{DX};{AC},a,{EMX};{AC},b,{BX};{AC},c,{DMX};{C},a,{EX};{C},b,{B};{C},c,{M};{BX},a,{A};{BX},b,{AC};{BX},c,{C};{DX},a,{A};{DX},b,{AC};{DX},c,{M};{EMX},a,{M};{EMX},b,{AC};{EMX},c,{C};{DMX},a,{A};{DMX},b,{AC};{DMX},c,{M};{EX},a,{M};{EX},b,{AC};{EX},c,{C};{B},a,{A};{B},b,{AC};{B},c,{C}>>
+# DMX BX EX EMX DX S
+
+# Output: 7;{S};{{DMX},{BSX},{EMX}};{a,b,c};{DMX},a,{A};{DMX},b,{AC};{EMX},b,{AC};{EMX},c,{C};{BSX},a,{A};{BSX},b,{AC};{BSX},c,{C};{B},a,{A};{B},b,{AC};{B},c,{C};{C},a,{EMX};{C},b,{B};{AC},a,{EMX};{AC},b,{BSX};{AC},c,{DMX};{A},b,{BSX};{A},c,{DMX}
+# DMX, BSX, EMX, A, AC, C, B
+
+
+# "6;S;{S,X};{a,b,c};S,a,A;S,b,A;S,b,C;S,c,C;A,a,M;A,b,B;A,b,X;A,c,D;A,c,X;B,a,A;B,b,A;B,b,C;B,c,C;C,a,E;C,a,X;C,b,B;c,b,X;C,c,M;D,a,A;D,b,A;D,b,C;D,c,M;E,a,M;E,b,A;E,b,C;E,c,C"
+#  Expected: 7;{BX};{{BX},{DMX},{EMX}};{a,b,c};{A},b,{BX};{A},c,{DMX};{AC},a,{EMX};{AC},b,{BX};{AC},c,{DMX};{B},a,{A};{B},b,{AC};{B},c,{C};{BX},a,{A};{BX},b,{AC};{BX},c,{C};{C},a,{EMX};{C},b,{B};{DMX},a,{A};{DMX},b,{AC};{EMX},b,{AC};{EMX},c,{C}
+# BX, DMX, EMX, A, AC, B, C
