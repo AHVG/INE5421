@@ -238,6 +238,11 @@ def main():
     vpl_input = argv[1]
     states, initial_state, final_states, alphabet, transitions = parse_automaton(vpl_input)
     ndfa = NonDeterministicFiniteAutomaton(states, initial_state, final_states, alphabet, transitions)
+    print(states)
+    print(initial_state)
+    print(final_states)
+    print(alphabet)
+    print(transitions)
     dfa = ndfa.determinize()
     m_dfa = dfa.minimize()
     print(f"<<{dfa}>><<{m_dfa}>>")

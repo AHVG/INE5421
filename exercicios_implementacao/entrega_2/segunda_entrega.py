@@ -243,47 +243,47 @@ class Regex:
         """Converte a regex da notação infixa para pós-fixa usando o algoritmo Shunting Yard."""
         precedence = {'*': 3, '.': 2, '|': 1}
         output = []
-        stack = []
+        stack_char = []
         for char in regex:
             if char in {'a', 'b', '&'}:
                 output.append(char)
             elif char == '(':
-                stack.append(char)
+                stack_char.append(char)
             elif char == ')':
-                while stack and stack[-1] != '(':
-                    output.append(stack.pop())
-                stack.pop()  # Remove '('
+                while stack_char and stack_char[-1] != '(':
+                    output.append(stack_char.pop())
+                stack_char.pop()  # Remove '('
             elif char in precedence:
-                while (stack and stack[-1] != '(' and
-                       precedence.get(stack[-1], 0) >= precedence[char]):
-                    output.append(stack.pop())
-                stack.append(char)
+                while (stack_char and stack_char[-1] != '(' and
+                       precedence.get(stack_char[-1], 0) >= precedence[char]):
+                    output.append(stack_char.pop())
+                stack_char.append(char)
             else:
                 raise ValueError(f"Caractere inválido na regex: {char}")
-        while stack:
-            if stack[-1] == '(' or stack[-1] == ')':
+        while stack_char:
+            if stack_char[-1] == '(' or stack_char[-1] == ')':
                 raise ValueError("Parênteses não balanceados na regex.")
-            output.append(stack.pop())
+            output.append(stack_char.pop())
         return ''.join(output)
 
     def build_tree(self, postfix):
         """Constrói a árvore de expressão regular a partir da notação pós-fixa."""
-        stack = []
+        stack_char = []
         for char in postfix:
             if char in {'a', 'b', '&'}:
-                stack.append(Node(char))
+                stack_char.append(Node(char))
             elif char == '*':
-                operand = stack.pop()
-                stack.append(Node(char, left=operand))
+                operand = stack_char.pop()
+                stack_char.append(Node(char, left=operand))
             elif char in {'.', '|'}:
-                right = stack.pop()
-                left = stack.pop()
-                stack.append(Node(char, left, right))
+                right = stack_char.pop()
+                left = stack_char.pop()
+                stack_char.append(Node(char, left, right))
             else:
                 raise ValueError(f"Caractere inválido na notação pós-fixa: {char}")
-        if len(stack) != 1:
+        if len(stack_char) != 1:
             raise ValueError("Erro na construção da árvore: pilha final não possui apenas a raiz.")
-        return stack[0]
+        return stack_char[0]
 
     def post_order(self, node):
         """Percorre a árvore em ordem pós-fixa e retorna uma lista dos valores."""
@@ -315,32 +315,33 @@ class Regex:
 
 class RegexProcessor:
     def __init__(self):
-        self.stack = []
+        self.stack_char = []
+        self.stack_automate = []
 
     def concatenate(self):
-        b = self.stack.pop()
-        a = self.stack.pop()
+        b = self.stack_char.pop()
+        a = self.stack_char.pop()
         result = f"({a}.{b})"
-        self.stack.append(result)
+        self.stack_char.append(result)
 
     def union(self):
-        b = self.stack.pop()
-        a = self.stack.pop()
+        b = self.stack_char.pop()
+        a = self.stack_char.pop()
         result = f"({a}|{b})"
-        self.stack.append(result)
+        self.stack_char.append(result)
+        b_automate = self.stack_automate.pop()
+        a_automate = self.stack_automate.pop()
+        result = NonDeterministicFiniteAutomaton(b.states.union(a.states), )
 
     def kleene_star(self):
-        a = self.stack.pop()
+        a = self.stack_char.pop()
         result = f"{a}*"
-        self.stack.append(result)
+        self.stack_char.append(result)
 
-    def intersection(self):
-        b = self.stack.pop()
-        a = self.stack.pop()
-        result = f"({a}&{b})"
-        self.stack.append(result)
 
     def evaluate_postfix(self, expression):
+        states = 0
+        chars_automates = {}
         for char in expression:
             if char == '.':  
                 self.concatenate()
@@ -348,13 +349,19 @@ class RegexProcessor:
                 self.union()
             elif char == '*': 
                 self.kleene_star()
-            else:  
-                self.stack.append(char)
+            else:
+                #if char not in chars_automates.keys():  
+                automate = NonDeterministicFiniteAutomaton({str(states + 1), str(states + 2)}, str(states + 1), str(states + 2), {char}, {(str(states + 1), char): {str(states + 2)}})
+                states += 2
+                #chars_automates[char] = automate
+                self.stack_char.append(char)
+                #self.stack_automate.append(chars_automates[char])
+                self.stack_automate.append(automate)
 
-        # The result will be the only element left in the stack
-        if len(self.stack) != 1:
+        # The result will be the only element left in the stack_char
+        if len(self.stack_char) != 1:
             raise ValueError("Error in postfix expression")
-        return self.stack.pop()
+        return self.stack_char.pop()
 
 
 
@@ -380,6 +387,9 @@ def main():
     print(regex)
     result = processor.evaluate_postfix(regex.regex_to_post_order_string())
     print(f"Result: {result}")
+    for automate in processor.stack_automate:
+        print(automate)
+    
 
 
     """ 
