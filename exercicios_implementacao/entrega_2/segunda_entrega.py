@@ -317,7 +317,7 @@ class RegexProcessor:
     def __init__(self):
         self.stack_char = []
         self.stack_automate = []
-
+        self.max_state_value = 0
     def concatenate(self):
         b = self.stack_char.pop()
         a = self.stack_char.pop()
@@ -326,13 +326,16 @@ class RegexProcessor:
         b_automate = self.stack_automate.pop()
         a_automate = self.stack_automate.pop()
         a_union_b_states = b_automate.states.union(a_automate.states)
-        max_state_value = max(map(int, a_union_b_states))
 
         #a_union_b_states.remove(list(a_automate.final_states)[0])
         new_states = a_union_b_states
         new_initial_state = a_automate.initial_state
         new_final_state = {list(b_automate.final_states)[0]}
         new_alphabet = b_automate.alphabet.union(a_automate.alphabet)
+
+        print(new_states)
+        print(new_initial_state)
+        print(new_final_state)
 
         
         print(b_automate)
@@ -353,20 +356,21 @@ class RegexProcessor:
         b_automate = self.stack_automate.pop()
         a_automate = self.stack_automate.pop()
         a_union_b_states = b_automate.states.union(a_automate.states)
-        max_state_value = max(map(int, a_union_b_states))
 
-        new_states = a_union_b_states.union({str(max_state_value + 1), str(max_state_value + 2)})
-        new_initial_state = str(max_state_value + 1)
-        new_final_state = {str(max_state_value + 2)}
+        new_states = a_union_b_states.union({str(self.max_state_value + 1), str(self.max_state_value + 2)})
+        new_initial_state = str(self.max_state_value + 1)
+        new_final_state = {str(self.max_state_value + 2)}
         new_alphabet = b_automate.alphabet.union(a_automate.alphabet)
         new_transitions = b_automate.transitions | a_automate.transitions | \
-                                                     {(str(max_state_value + 1), '&') : {b_automate.initial_state}, \
-                                                      (str(max_state_value + 1), '&') : {a_automate.initial_state},\
-                                                      (list(b_automate.final_states)[0], '&') : {str(max_state_value + 2)}, \
-                                                      (list(a_automate.final_states)[0], '&') : {str(max_state_value + 2)}}
-        
+                                                     {(str(self.max_state_value + 1), '&') : {b_automate.initial_state}, \
+                                                      (str(self.max_state_value + 1), '&') : {a_automate.initial_state},\
+                                                      (list(b_automate.final_states)[0], '&') : {str(self.max_state_value + 2)}, \
+                                                      (list(a_automate.final_states)[0], '&') : {str(self.max_state_value + 2)}}
+        self.max_state_value += 2
         result = NonDeterministicFiniteAutomaton(new_states, new_initial_state, new_final_state, new_alphabet, new_transitions)
-
+        print(new_states)
+        print(new_initial_state)
+        print(new_final_state)
         print(b_automate)
         print(a_automate)
         print('+')
@@ -378,19 +382,19 @@ class RegexProcessor:
         result = f"{a}*"
         self.stack_char.append(result)
         a_automate = self.stack_automate.pop()
-        max_state_value = max(map(int, a_automate.states))
-
-        new_states = a_automate.states.union({str(max_state_value + 1), str(max_state_value + 2)})
-        new_initial_state = str(max_state_value + 1)
-        new_final_state = {str(max_state_value + 2)}
+        new_states = a_automate.states.union({str(self.max_state_value + 1), str(self.max_state_value + 2)})
+        new_initial_state = str(self.max_state_value + 1)
+        new_final_state = {str(self.max_state_value + 2)}
         new_alphabet = a_automate.alphabet
-        new_transitions = a_automate.transitions | {(str(max_state_value + 1), '&') : {a_automate.initial_state}, \
-                                                    (list(a_automate.final_states)[0], '&') : {str(max_state_value + 2)}, \
+        new_transitions = a_automate.transitions | {(str(self.max_state_value + 1), '&') : {a_automate.initial_state}, \
+                                                    (list(a_automate.final_states)[0], '&') : {str(self.max_state_value + 2)}, \
                                                     (list(a_automate.final_states)[0], '&') : {a_automate.initial_state}, \
-                                                    (list(a_automate.initial_state)[0], '&') : {str(max_state_value + 2)}}
-        
+                                                    (list(a_automate.initial_state)[0], '&') : {str(self.max_state_value + 2)}}
+        self.max_state_value += 2
         result = NonDeterministicFiniteAutomaton(new_states, new_initial_state, new_final_state, new_alphabet, new_transitions)
-
+        print(new_states)
+        print(new_initial_state)
+        print(new_final_state)
         print(a_automate)
         print('*')
         print(f'Result: {result}\n\n')
@@ -398,7 +402,6 @@ class RegexProcessor:
 
 
     def evaluate_postfix(self, expression):
-        states = 0
         chars_automates = {}
         for char in expression:
             if char == '.':  
@@ -409,8 +412,8 @@ class RegexProcessor:
                 self.kleene_star()
             else:
                 #if char not in chars_automates.keys():  
-                automate = NonDeterministicFiniteAutomaton({str(states + 1), str(states + 2)}, str(states + 1), {str(states + 2)}, {char}, {(str(states + 1), char): {str(states + 2)}})
-                states += 2
+                automate = NonDeterministicFiniteAutomaton({str(self.max_state_value + 1), str(self.max_state_value + 2)}, str(self.max_state_value + 1), {str(self.max_state_value + 2)}, {char}, {(str(self.max_state_value + 1), char): {str(self.max_state_value + 2)}})
+                self.max_state_value += 2
                 #chars_automates[char] = automate
                 self.stack_char.append(char)
                 #self.stack_automate.append(chars_automates[char])
