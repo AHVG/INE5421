@@ -318,6 +318,7 @@ class RegexProcessor:
         self.stack_char = []
         self.stack_automate = []
         self.max_state_value = 0
+
     def concatenate(self):
         b = self.stack_char.pop()
         a = self.stack_char.pop()
@@ -362,8 +363,7 @@ class RegexProcessor:
         new_final_state = {str(self.max_state_value + 2)}
         new_alphabet = b_automate.alphabet.union(a_automate.alphabet)
         new_transitions = b_automate.transitions | a_automate.transitions | \
-                                                     {(str(self.max_state_value + 1), '&') : {b_automate.initial_state}, \
-                                                      (str(self.max_state_value + 1), '&') : {a_automate.initial_state},\
+                                                     {(str(self.max_state_value + 1), '&') : {b_automate.initial_state, a_automate.initial_state}, \
                                                       (list(b_automate.final_states)[0], '&') : {str(self.max_state_value + 2)}, \
                                                       (list(a_automate.final_states)[0], '&') : {str(self.max_state_value + 2)}}
         self.max_state_value += 2
@@ -387,9 +387,8 @@ class RegexProcessor:
         new_final_state = {str(self.max_state_value + 2)}
         new_alphabet = a_automate.alphabet
         new_transitions = a_automate.transitions | {(str(self.max_state_value + 1), '&') : {a_automate.initial_state}, \
-                                                    (list(a_automate.final_states)[0], '&') : {str(self.max_state_value + 2)}, \
-                                                    (list(a_automate.final_states)[0], '&') : {a_automate.initial_state}, \
-                                                    (list(a_automate.initial_state)[0], '&') : {str(self.max_state_value + 2)}}
+                                                    (list(a_automate.final_states)[0], '&') : {str(self.max_state_value + 2), \
+                                                     a_automate.initial_state, str(self.max_state_value + 2)}}
         self.max_state_value += 2
         result = NonDeterministicFiniteAutomaton(new_states, new_initial_state, new_final_state, new_alphabet, new_transitions)
         print(new_states)
@@ -401,8 +400,7 @@ class RegexProcessor:
         self.stack_automate.append(result)
 
 
-    def evaluate_postfix(self, expression):
-        chars_automates = {}
+    def get_ndfa_from_regex(self, expression):
         for char in expression:
             if char == '.':  
                 self.concatenate()
@@ -411,18 +409,14 @@ class RegexProcessor:
             elif char == '*': 
                 self.kleene_star()
             else:
-                #if char not in chars_automates.keys():  
                 automate = NonDeterministicFiniteAutomaton({str(self.max_state_value + 1), str(self.max_state_value + 2)}, str(self.max_state_value + 1), {str(self.max_state_value + 2)}, {char}, {(str(self.max_state_value + 1), char): {str(self.max_state_value + 2)}})
                 self.max_state_value += 2
-                #chars_automates[char] = automate
                 self.stack_char.append(char)
-                #self.stack_automate.append(chars_automates[char])
                 self.stack_automate.append(automate)
 
-        # The result will be the only element left in the stack_char
         if len(self.stack_char) != 1:
             raise ValueError("Error in postfix expression")
-        return self.stack_char.pop()
+        return self.stack_automate.pop()
 
 
 
@@ -446,7 +440,12 @@ def main():
     regex = Regex(input_string)
     processor = RegexProcessor()
     print(regex)
-    result = processor.evaluate_postfix(regex.regex_to_post_order_string())
+    result = processor.get_ndfa_from_regex(regex.regex_to_post_order_string())
+    print(result)
+    print(result.transitions)
+    dfa = result.determinize()
+    m_dfa = dfa.minimize()
+    print(m_dfa)
     #print(f"Result: {result}")
     #for automate in processor.stack_automate:
     #    print(automate)
@@ -462,3 +461,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+#TODO erro no fecho de kleene
