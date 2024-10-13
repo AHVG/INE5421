@@ -386,9 +386,8 @@ class RegexProcessor:
         new_initial_state = str(self.max_state_value + 1)
         new_final_state = {str(self.max_state_value + 2)}
         new_alphabet = a_automate.alphabet
-        new_transitions = a_automate.transitions | {(str(self.max_state_value + 1), '&') : {a_automate.initial_state}, \
-                                                    (list(a_automate.final_states)[0], '&') : {str(self.max_state_value + 2), \
-                                                     a_automate.initial_state, str(self.max_state_value + 2)}}
+        new_transitions = a_automate.transitions | {(str(self.max_state_value + 1), '&') : {a_automate.initial_state, str(self.max_state_value + 2)}, \
+                                                    (list(a_automate.final_states)[0], '&') : {str(self.max_state_value + 2), a_automate.initial_state}}
         self.max_state_value += 2
         result = NonDeterministicFiniteAutomaton(new_states, new_initial_state, new_final_state, new_alphabet, new_transitions)
         print(new_states)
@@ -436,7 +435,7 @@ def main():
     
     # Exemplo de uso da classe Regex para processar uma ER
 
-    input_string = "(&|b)(ab)*(&|a)"  # Exemplo de expressão regular
+    input_string = "&|b|a|bb*a"  # Exemplo de expressão regular
     regex = Regex(input_string)
     processor = RegexProcessor()
     print(regex)
