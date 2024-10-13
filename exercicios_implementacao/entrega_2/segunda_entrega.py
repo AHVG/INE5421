@@ -242,6 +242,7 @@ class Regex:
     def to_postfix(self, regex):
         """Converte a regex da notação infixa para pós-fixa usando o algoritmo Shunting Yard."""
         precedence = {'*': 3, '.': 2, '|': 1}
+        associativity = {'*': 'right', '.': 'right', '|': 'left'}
         output = []
         stack_char = []
         for char in regex:
@@ -255,7 +256,8 @@ class Regex:
                 stack_char.pop()  # Remove '('
             elif char in precedence:
                 while (stack_char and stack_char[-1] != '(' and
-                       precedence.get(stack_char[-1], 0) >= precedence[char]):
+                    ((associativity[char] == 'left' and precedence[char] <= precedence[stack_char[-1]]) or
+                        (associativity[char] == 'right' and precedence[char] < precedence[stack_char[-1]]))):
                     output.append(stack_char.pop())
                 stack_char.append(char)
             else:
@@ -435,7 +437,7 @@ def main():
     
     # Exemplo de uso da classe Regex para processar uma ER
 
-    input_string = "&|b|a|bb*a"  # Exemplo de expressão regular
+    input_string = "(&|b)(ab)*(&|a)"  # Exemplo de expressão regular
     regex = Regex(input_string)
     processor = RegexProcessor()
     print(regex)
