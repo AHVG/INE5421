@@ -22,6 +22,16 @@ class FiniteAutomaton:
 
     def transition(self, state, symbol):
         return self.transitions.get((state, symbol), None)
+    
+    def automate_union(self, automate):
+        new_states = self.states.union(automate.states) | {'qo'}
+        print(new_states)
+        new_initial_state = "q0"
+        new_final_states = self.final_states | automate.final_states
+        new_alphabet = self.alphabet.union(automate.alphabet)
+        new_transitions = self.transitions | automate.transitions | {('q0', '&') : {self.initial_state, automate.initial_state}}
+        
+        return NonDeterministicFiniteAutomaton(new_states, new_initial_state, new_final_states, new_alphabet, new_transitions)
 
     def __str__(self) -> str:
         def format_state(state):
@@ -335,7 +345,7 @@ class RegexProcessor:
         new_initial_state = a_automate.initial_state
         new_final_state = {list(b_automate.final_states)[0]}
         new_alphabet = b_automate.alphabet.union(a_automate.alphabet)
-
+        """
         print(new_states)
         print(new_initial_state)
         print(new_final_state)
@@ -343,19 +353,19 @@ class RegexProcessor:
         
         print(b_automate)
         print(a_automate)
-
-        new_transitions = b_automate.transitions | a_automate.transitions | {(list(a_automate.final_states)[0], '&'): {b_automate.initial_state}}
+        """
+        new_transitions = b_automate.transitions | a_automate.transitions | {(frozenset(list(a_automate.final_states)[0]), '&'): {b_automate.initial_state}}
         
         result = NonDeterministicFiniteAutomaton(new_states, new_initial_state, new_final_state, new_alphabet, new_transitions)
-        print('.')
-        print(f'Result: {result}\n\n')
+       # print('.')
+       # print(f'Result: {result}\n\n')
         self.stack_automate.append(result)
 
     def union(self):
-        b = self.stack_char.pop()
-        a = self.stack_char.pop()
-        result = f"({a}|{b})"
-        self.stack_char.append(result)
+        #b = self.stack_char.pop()
+        #a = self.stack_char.pop()
+        #result = f"({a}|{b})"
+        #self.stack_char.append(result)
         b_automate = self.stack_automate.pop()
         a_automate = self.stack_automate.pop()
         a_union_b_states = b_automate.states.union(a_automate.states)
@@ -365,11 +375,12 @@ class RegexProcessor:
         new_final_state = {str(self.max_state_value + 2)}
         new_alphabet = b_automate.alphabet.union(a_automate.alphabet)
         new_transitions = b_automate.transitions | a_automate.transitions | \
-                                                     {(str(self.max_state_value + 1), '&') : {b_automate.initial_state, a_automate.initial_state}, \
-                                                      (list(b_automate.final_states)[0], '&') : {str(self.max_state_value + 2)}, \
-                                                      (list(a_automate.final_states)[0], '&') : {str(self.max_state_value + 2)}}
+                                                     {(frozenset(str(self.max_state_value + 1)), '&') : {b_automate.initial_state, a_automate.initial_state}, \
+                                                      {(frozenset(list(b_automate.final_states)[0]), '&')} : {str(self.max_state_value + 2)}, \
+                                                      {(frozenset(list(a_automate.final_states)[0]), '&')} : {str(self.max_state_value + 2)}}
         self.max_state_value += 2
         result = NonDeterministicFiniteAutomaton(new_states, new_initial_state, new_final_state, new_alphabet, new_transitions)
+        """
         print(new_states)
         print(new_initial_state)
         print(new_final_state)
@@ -377,6 +388,7 @@ class RegexProcessor:
         print(a_automate)
         print('+')
         print(f'Result: {result}\n\n')
+        """
         self.stack_automate.append(result)
 
     def kleene_star(self):
@@ -388,16 +400,18 @@ class RegexProcessor:
         new_initial_state = str(self.max_state_value + 1)
         new_final_state = {str(self.max_state_value + 2)}
         new_alphabet = a_automate.alphabet
-        new_transitions = a_automate.transitions | {(str(self.max_state_value + 1), '&') : {a_automate.initial_state, str(self.max_state_value + 2)}, \
-                                                    (list(a_automate.final_states)[0], '&') : {str(self.max_state_value + 2), a_automate.initial_state}}
+        new_transitions = a_automate.transitions | {(frozenset(str(self.max_state_value + 1)), '&') : {a_automate.initial_state, str(self.max_state_value + 2)}, \
+                                                    (frozenset(list(a_automate.final_states)[0]), '&') : {str(self.max_state_value + 2), a_automate.initial_state}}
         self.max_state_value += 2
         result = NonDeterministicFiniteAutomaton(new_states, new_initial_state, new_final_state, new_alphabet, new_transitions)
+        """
         print(new_states)
         print(new_initial_state)
         print(new_final_state)
         print(a_automate)
         print('*')
         print(f'Result: {result}\n\n')
+        """
         self.stack_automate.append(result)
 
 
@@ -410,13 +424,12 @@ class RegexProcessor:
             elif char == '*': 
                 self.kleene_star()
             else:
-                automate = NonDeterministicFiniteAutomaton({str(self.max_state_value + 1), str(self.max_state_value + 2)}, str(self.max_state_value + 1), {str(self.max_state_value + 2)}, {char}, {(str(self.max_state_value + 1), char): {str(self.max_state_value + 2)}})
+                automate = NonDeterministicFiniteAutomaton({str(self.max_state_value + 1), str(self.max_state_value + 2)}, str(self.max_state_value + 1), {str(self.max_state_value + 2)}, {char}, {(frozenset(str(self.max_state_value + 1)), char): {str(self.max_state_value + 2)}})
                 self.max_state_value += 2
                 self.stack_char.append(char)
                 self.stack_automate.append(automate)
-
-        if len(self.stack_char) != 1:
-            raise ValueError("Error in postfix expression")
+        
+        self.stack_char = []
         return self.stack_automate.pop()
 
 
@@ -433,20 +446,37 @@ def main():
 
     <7;{q0};{{{1,2,4,5}},{{3,5}},{{2,4,5}},{{1,2,3,6}},{{6}},{{4,5,6}}};{a,b};{q0},&,{{1,2,4,5}};{q0},&,{{1,2,3,6}};{1,2,4,5},a,{3,5};{1,2,4,5},b,{2,4,5};{3,5},b,{2,4,5};{2,4,5},a,{3,5};{1,2,3,6},a,{6};{1,2,3,6},b,{4,5,6};{4,5,6},a,{6};{4,5,6},b,{4,5};{4,5},a,{6};{4,5},b,{4,5}>
     """
-    #vpl_input = argv[1] # **Não remover essa linha**, ela é responsável por receber a string de entrada do VPL
+    vpl_input = argv[1] # **Não remover essa linha**, ela é responsável por receber a string de entrada do VPL
     
     # Exemplo de uso da classe Regex para processar uma ER
 
-    input_string = "(&|b)(ab)*(&|a)"  # Exemplo de expressão regular
-    regex = Regex(input_string)
+
+    #input_string_1 = "(&|b)(ab)*(&|a)"  # Exemplo de expressão regular
+    #input_string_2 = "&|b|a|bb*a"
+    parts = vpl_input[1:-1].split("><")
+
+    # Atribuir as duas partes às variáveis input1 e input2
+    input1 = parts[0]
+    input2 = parts[1]
+    regex1 = Regex(input1)
+    regex2 = Regex(input2)
     processor = RegexProcessor()
-    print(regex)
-    result = processor.get_ndfa_from_regex(regex.regex_to_post_order_string())
-    print(result)
-    print(result.transitions)
-    dfa = result.determinize()
-    m_dfa = dfa.minimize()
-    print(m_dfa)
+    #print(regex1)
+    result1_ndfa = processor.get_ndfa_from_regex(regex1.regex_to_post_order_string())
+    result2_ndfa = processor.get_ndfa_from_regex(regex2.regex_to_post_order_string())
+
+    #print(result1)
+    dfa1 = result1_ndfa.determinize()
+    m_dfa1 = dfa1.minimize()
+    dfa2 = result2_ndfa.determinize()
+    m_dfa2 = dfa2.minimize()
+
+    union_result = m_dfa1.automate_union(m_dfa2)
+
+    print(m_dfa1)
+    print(m_dfa2)
+    print(union_result)
+    #print(m_dfa)
     #print(f"Result: {result}")
     #for automate in processor.stack_automate:
     #    print(automate)
@@ -463,4 +493,3 @@ def main():
 if __name__ == "__main__":
     main()
 
-#TODO erro no fecho de kleene
