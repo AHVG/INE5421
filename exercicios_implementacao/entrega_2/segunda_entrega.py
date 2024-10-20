@@ -22,10 +22,22 @@ class FiniteAutomaton:
 
     def transition(self, state, symbol):
         return self.transitions.get((state, symbol), None)
+    
+    def automate_union(self, automate):
+        new_states = self.states.union(automate.states) | {'qo'}
+        new_initial_state = "q0"
+        new_final_states = self.final_states | automate.final_states
+        new_alphabet = self.alphabet.union(automate.alphabet)
+        new_transitions = self.transitions | automate.transitions | {('q0', '&') : {self.initial_state, automate.initial_state}}
+        
+        return NonDeterministicFiniteAutomaton(new_states, new_initial_state, new_final_states, new_alphabet, new_transitions)
 
     def __str__(self) -> str:
         def format_state(state):
-            return "{" + "".join(sorted(list(state))) + "}"
+            # Verifica se o estado é um frozenset, converte os elementos em strings e os ordena
+            if isinstance(state, frozenset):
+                return "{" + ",".join(sorted(map(str, state))) + "}"
+            return str(state)
 
         num_states = len(self.states)
         initial_state = format_state(self.initial_state)
@@ -40,114 +52,62 @@ class DeterministicFiniteAutomaton(FiniteAutomaton):
 
     def minimize(self):
         new_initial_state = self.initial_state
-        new_final_states = set()
         new_alphabet = self.alphabet
         new_transitions = self.transitions.copy()
 
-        # Remover estados inalcancaveis
-        reachable_states = set()
-        new_states = {self.initial_state}
+        # Constrói a partição inicial: estados finais e não finais
+        partition = [self.final_states, set(self.states) - set(self.final_states)]
 
-        while new_states:
-            state = new_states.pop()
-            reachable_states.add(state)
-
-            for symbol in self.alphabet:
-                next_state = self.transition(state, symbol)
-                if next_state and next_state not in reachable_states:
-                    new_states.add(next_state)
-
-        new_states = reachable_states
-        new_transitions = {k: v for k, v in self.transitions.items() if k[0] in reachable_states}
-        new_final_states = {state for state in self.final_states if state in reachable_states}
-
-        # Remover estados mortos
-        alive_states = set(new_final_states)
-        changed = True
-
-        while changed:
-            changed = False
-            for (state, symbol), next_state in new_transitions.items():
-                if next_state in alive_states and state not in alive_states:
-                    alive_states.add(state)
-                    changed = True
-
-        new_states = alive_states
-        new_transitions = {(state, symbol): next_state for (state, symbol), next_state in new_transitions.items() if state in alive_states and next_state in alive_states}
-        new_final_states = {state for state in new_final_states if state in alive_states}
-
-        # Remover estados equivalentes
-        partition = [new_final_states, new_states - new_final_states]
+        def find_group(state, partition):
+            """Encontra o grupo de uma partição ao qual o estado pertence."""
+            for group in partition:
+                if state in group:
+                    return group
+            return None
 
         while True:
             new_partition = []
             for group in partition:
+                # Tenta dividir o grupo atual com base nas transições
                 partitions = {}
                 for state in group:
-                    key = list({new_transitions.get((state, symbol), None) for symbol in new_alphabet})
-
-                    for l, k in enumerate(key):
-                        for j, p in enumerate(partition):
-                            if k in p:
-                                key[l] = j
-
-                    key = tuple(key)
-
+                    key = []
+                    for symbol in new_alphabet:
+                        next_state = self.transition(state, symbol)
+                        if next_state:
+                            key.append(frozenset(find_group(next_state, partition)))  # converte para frozenset
+                        else:
+                            key.append(None)
+                    key = tuple(key)  # converte a lista para uma tupla
                     if key not in partitions:
                         partitions[key] = set()
                     partitions[key].add(state)
-
+                
                 new_partition.extend(partitions.values())
-
+            
             if len(new_partition) == len(partition):
-                break
-
+                break  # Nenhuma alteração na partição
             partition = new_partition
-        
 
-        new_partition = [group for group in partition if group]
-        
+        # Mapeia os novos estados
         state_for_group = {}
-        for group in new_partition:
-            temp = frozenset(set.union(*[set(s) for s in group]))
+        for group in partition:
+            new_state = frozenset(group)  # usa frozenset para representar o novo estado
             for state in group:
-                state_for_group[state] = temp
+                state_for_group[state] = new_state
 
-        for group in new_partition:
-            if new_initial_state in group:
-                new_initial_state = frozenset(set.union(*[set(s) for s in group]))
-                break
-        new_new_transition = {}
-        new_new_states = set()
-        
-        for group in new_partition:
-            new_state = frozenset(set.union(*[set(s) for s in group]))
-            for symbol in new_alphabet:
-                for state in group:
-                    next_state = new_transitions.get((state, symbol), None)
-                    if next_state:
-                        if (new_state, symbol) not in new_new_transition:
-                            new_new_transition[(new_state, symbol)] = set()
-    
-                        if next_state in state_for_group:
-                            new_new_transition[(new_state, symbol)].add(state_for_group[next_state])
-                        else:
-                            new_new_transition[(new_state, symbol)].add(next_state)
+        # Define novos estados, transições e estados finais
+        new_states = set(state_for_group.values())
+        new_transitions = {}
+        for (state, symbol), next_state in self.transitions.items():
+            new_transitions[(state_for_group[state], symbol)] = state_for_group[next_state]
 
-                if (new_state, symbol) in new_new_transition:
-                    new_new_transition[(new_state, symbol)] = frozenset(set.union(*[set(s) for s in new_new_transition[(new_state, symbol)]]))
-            new_new_states.add(new_state)
+        new_final_states = {state_for_group[state] for state in self.final_states}
+        new_initial_state = state_for_group[self.initial_state]
 
-        new_states = new_new_states
-        new_new_final_states = set()
-        for f in new_states:
-            for final_state in new_final_states:
-                if final_state <= f:
-                    new_new_final_states.add(f)
-        new_final_states = new_new_final_states
-        new_transitions = new_new_transition.copy()
+        return DeterministicFiniteAutomaton(new_states, new_initial_state, new_final_states, new_alphabet, new_transitions)
 
-        return DeterministicFiniteAutomaton(frozenset(new_states), new_initial_state, frozenset(new_final_states), new_alphabet, new_transitions)
+
 
 class NonDeterministicFiniteAutomaton(FiniteAutomaton):
     def epsilon_closure(self, state):
@@ -415,8 +375,6 @@ class RegexProcessor:
                 self.stack_char.append(char)
                 self.stack_automate.append(automate)
 
-        if len(self.stack_char) != 1:
-            raise ValueError("Error in postfix expression")
         return self.stack_automate.pop()
 
 
@@ -437,16 +395,39 @@ def main():
     
     # Exemplo de uso da classe Regex para processar uma ER
 
-    input_string = "(&|b)(ab)*(&|a)"  # Exemplo de expressão regular
-    regex = Regex(input_string)
+    vpl_input = argv[1] # **Não remover essa linha**, ela é responsável por receber a string de entrada do VPL
+    
+    # Exemplo de uso da classe Regex para processar uma ER
+
+
+    #input_string_1 = "(&|b)(ab)*(&|a)"  # Exemplo de expressão regular
+    #input_string_2 = "&|b|a|bb*a"
+    parts = vpl_input[1:-1].split("><")
+
+    # Atribuir as duas partes às variáveis input1 e input2
+    input1 = parts[0]
+    input2 = parts[1]
+    regex1 = Regex(input1)
+    regex2 = Regex(input2)
     processor = RegexProcessor()
-    print(regex)
-    result = processor.get_ndfa_from_regex(regex.regex_to_post_order_string())
-    print(result)
-    print(result.transitions)
-    dfa = result.determinize()
-    m_dfa = dfa.minimize()
-    print(m_dfa)
+    #print(regex1)
+    #result1_ndfa = processor.get_ndfa_from_regex(regex1.regex_to_post_order_string())
+    #result2_ndfa = processor.get_ndfa_from_regex(regex2.regex_to_post_order_string())
+
+    #input_string = "&|b|a|bb*a"  # Exemplo de expressão regular
+    #regex = Regex(result2_ndfa)
+    #processor = RegexProcessor()
+    print(regex2)
+    result1_ndfa = processor.get_ndfa_from_regex(regex1.regex_to_post_order_string())
+    result2_ndfa = processor.get_ndfa_from_regex(regex2.regex_to_post_order_string())
+    dfa_1 = result1_ndfa.determinize()
+    dfa_2 = result2_ndfa.determinize()
+    m_dfa_1 = dfa_1.minimize()
+    m_dfa_2 = dfa_2.minimize()
+    union = m_dfa_1.automate_union(m_dfa_2)
+    print(m_dfa_1)
+    print(m_dfa_2)
+    print(union)
     #print(f"Result: {result}")
     #for automate in processor.stack_automate:
     #    print(automate)
@@ -463,4 +444,3 @@ def main():
 if __name__ == "__main__":
     main()
 
-#TODO erro no fecho de kleene
