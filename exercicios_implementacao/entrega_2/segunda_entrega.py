@@ -35,9 +35,18 @@ class FiniteAutomaton:
         initial_state = format_state(self.initial_state)
         final_states = format_state(self.final_states)
         alphabet = "{" + ",".join(a for a in self.alphabet) + "}"
-        transitions = ";".join(format_state(from_state) + "," + symbol + "," + format_state(to_state) for (from_state, symbol), to_state in self.transitions.items())
 
-        return f"{num_states};{initial_state};{final_states};{alphabet};{transitions}"
+        transitions = []
+        for (from_state, symbol), to_states in self.transitions.items():
+            if isinstance(to_states, set):  
+                for to_state in to_states:  
+                    transitions.append(f"{format_state(from_state)},{symbol},{format_state(to_state)}")
+            else:  
+                transitions.append(f"{format_state(from_state)},{symbol},{format_state(to_states)}")
+
+        transitions_str = ";".join(transitions)
+
+        return f"{num_states};{initial_state};{final_states};{alphabet};{transitions_str}"
 
 
 class DeterministicFiniteAutomaton(FiniteAutomaton):
@@ -258,12 +267,9 @@ class Regex:
         return ''.join(traversal)
 
     def __str__(self):
-        """Retorna a expressão regular e sua representação em pós-ordem."""
         return f"{self.regex_to_post_order_string()}"
 
     def regex_original(self):
-        """Retorna a regex original sem operadores de concatenação explícitos."""
-        # Remover os pontos adicionados para concatenação
         result = []
         for char in self.regex:
             if char != '.':
@@ -380,14 +386,12 @@ def main():
     """
     vpl_input = argv[1] # **Não remover essa linha**, ela é responsável por receber a string de entrada do VPL
     
-    # Dividir a entrada em duas partes
     parts = vpl_input[1:-1].split("><")
 
     if len(parts) != 2:
         print("Entrada inválida. Deve conter duas expressões regulares separadas por '><'.")
         return
 
-    # Atribuir as duas partes às variáveis input1 e input2
     input1 = parts[0]
     input2 = parts[1]
     regex1 = Regex(input1)
