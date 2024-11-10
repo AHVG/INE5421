@@ -31,7 +31,6 @@ class ContextFreeGrammar:
         """Elimina produções ε seguindo o algoritmo especificado."""
         # Passo 1: Identificar o conjunto E dos ε-não-terminais
         E = self.identify_non_terminal_epsilon()
-
         # Passo 2: Construir P' sem as ε-produções
         P_prime = {A: [prod for prod in self.P.get(A, []) if prod != []] for A in self.P}
 
@@ -51,6 +50,16 @@ class ContextFreeGrammar:
                                 new_productions.append(new_prod)
                                 modified = True
                 P_prime[A].extend(new_productions)
+
+        P_prime_tmp = P_prime
+        for non_terminal, prods in P_prime_tmp.items():
+            for prod in prods:
+                for char in prod[0]:
+                    production = prod[0]
+                    # Se algum caractere representar um terminal em E e a produção ter mais de um caractere
+                    if char in E and len(production) > 1:
+                        # Adiciona produção removendo variável anulável
+                        P_prime[non_terminal].append([production.replace(char, "")])
 
         # Passo 4: Adicionar produções para o novo símbolo inicial, se necessário
         if self.S in E:
