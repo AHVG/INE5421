@@ -55,9 +55,9 @@ class ContextFreeGrammar:
         for non_terminal, prods in P_prime_tmp.items():
             for prod in prods:
                 for char in prod[0]:
-                    production = prod[0]
                     # Se algum caractere representar um terminal em E e a produção ter mais de um caractere
-                    if char in E and len(production) > 1:
+                    if char in E and len(prod[0]) > 1:
+                        production = prod[0]
                         # Adiciona produção removendo variável anulável
                         P_prime[non_terminal].append([production.replace(char, "")])
 
