@@ -1,6 +1,5 @@
 from sys import argv
 import re
-from itertools import chain, combinations
 
 class ContextFreeGrammar:
     def __init__(self, N, T, P, S):
@@ -75,6 +74,82 @@ class ContextFreeGrammar:
         self.P = P_prime
         self.S = S_prime
 
+        return ContextFreeGrammar(self.N, self.T, self.P, self.S)
+    
+    def eliminate_circular_productions(self):
+        for non_terminal in self.P:
+            # Filtra produções removendo aquelas que são do tipo A -> A
+            self.P[non_terminal] = [
+                prod for prod in self.P[non_terminal]
+                if not (len(prod) == 1 and prod[0] == non_terminal)
+            ]
+        
+        return ContextFreeGrammar(self.N, self.T, self.P, self.S)
+    
+    def eliminate_unit_productions(self):
+        P_prime = {}  # Novo conjunto de produções
+
+        # Passo 1: Construir NA para cada A ∈ N
+        N_A = {A: {A} for A in self.N}
+        
+        # Expande N_A para incluir todos os não-terminais alcançáveis por produções unitárias
+        for A in self.N:
+            queue = list(N_A[A])
+            while queue:
+                B = queue.pop(0)
+                for prod in self.P.get(B, []):
+                    if len(prod) == 1 and prod[0] in self.N:
+                        C = prod[0]
+                        if C not in N_A[A]:
+                            N_A[A].add(C)
+                            queue.append(C)
+
+        # Passo 2: Construir P' sem as produções unitárias
+        for A in self.N:
+            P_prime[A] = []
+            for B in N_A[A]:
+                for prod in self.P.get(B, []):
+                    if len(prod) != 1 or prod[0] not in self.N:
+                        if prod not in P_prime[A]:
+                            P_prime[A].append(prod)
+
+        self.P = P_prime  # Atualiza P com o novo conjunto de produções P'
+
+    def eliminate_unproductive_symbols(self):
+        """Elimina símbolos improdutivos da gramática."""
+        # Inicializa SP com os terminais e ε
+        SP = set(self.T)
+
+        # Repete até que nenhum novo símbolo seja adicionado a SP
+        while True:
+            # Encontra todos os não-terminais que têm pelo menos uma produção composta apenas por símbolos em SP
+            Q = {
+                X for X in self.N if X not in SP and any(
+                    all(symbol in SP for symbol in prod) for prod in self.P.get(X, [])
+                )
+            }
+            if not Q:
+                break
+            SP.update(Q)
+
+        # Constrói N' e P' com símbolos produtivos
+        N_prime = SP & self.N
+        if self.S in SP:
+            # Apenas mantém produções onde todos os símbolos são produtivos
+            P_prime = {
+                A: [prod for prod in self.P.get(A, []) if all(symbol in SP for symbol in prod)]
+                for A in N_prime
+            }
+            # Remove entradas vazias de produções
+            self.N = N_prime
+            self.P = {A: prods for A, prods in P_prime.items() if prods}
+        else:
+            # Se o símbolo inicial não for produtivo, a linguagem é vazia
+            print("L(G) = ∅")
+            self.N = set()
+            self.P = {}
+
+
 def parse_input(entrada):
     # Expressão regular para encontrar os quatro conjuntos no formato "{...}"
     conjuntos = re.findall(r"\{(.*?)\}", entrada)
@@ -99,7 +174,10 @@ def main():
     N,T,P,S = parse_input(argv[1])
     cfg = ContextFreeGrammar(N,T,P,S)
     #print(cfg)
-    cfg.eliminate_non_terminal_epsilon()
+    #cfg.eliminate_non_terminal_epsilon()
+    #cfg.eliminate_circular_productions()
+    #cfg.eliminate_unit_productions()
+    cfg.eliminate_unproductive_symbols()
     print(cfg)
 
 
