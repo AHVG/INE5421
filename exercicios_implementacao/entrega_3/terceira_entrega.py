@@ -171,7 +171,8 @@ def parse_input(entrada):
 
 
 def main():
-    N,T,P,S = parse_input(argv[1])
+    vpl_input = argv[1] # **Não remover essa linha**, ela é responsável por receber a string de entrada do VPL
+    N,T,P,S = parse_input(vpl_input)
     cfg = ContextFreeGrammar(N,T,P,S)
     #print(cfg)
     #cfg.eliminate_non_terminal_epsilon()
