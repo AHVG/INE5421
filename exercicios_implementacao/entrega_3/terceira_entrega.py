@@ -117,34 +117,37 @@ class ContextFreeGrammar:
 
     def eliminate_unproductive_symbols(self):
         """Elimina símbolos improdutivos da gramática."""
-        # Inicializa SP com os terminais e ε
+        # SP := T
         SP = set(self.T)
-
-        # Repete até que nenhum novo símbolo seja adicionado a SP
+        # Repita
         while True:
-            # Encontra todos os não-terminais que têm pelo menos uma produção composta apenas por símbolos em SP
-            Q = {
-                X for X in self.N if X not in SP and any(
-                    all(symbol in SP for symbol in prod) for prod in self.P.get(X, [])
-                )
-            }
+            # Q := {X | X ∈ N e X não está em SP e existe pelo menos uma produção X ::= X1X2...Xn tal que X1, X2, ..., Xn ∈ SP}
+            Q = set()
+            for X in self.N:
+                if X not in SP:
+                    for prod in self.P.get(X, []):
+                        if all(symbol in SP for symbol in prod[0]):
+                            Q.add(X)
+                            break
+            # Até Q = ∅
             if not Q:
                 break
             SP.update(Q)
-
-        # Constrói N' e P' com símbolos produtivos
+        # N' := SP ∩ N
         N_prime = SP & self.N
         if self.S in SP:
-            # Apenas mantém produções onde todos os símbolos são produtivos
-            P_prime = {
-                A: [prod for prod in self.P.get(A, []) if all(symbol in SP for symbol in prod)]
-                for A in N_prime
-            }
-            # Remove entradas vazias de produções
+            # P' := {p | p ∈ P e todos os símbolos de p ∈ SP}
+            P_prime = {}
+            for A in N_prime:
+                new_prods = []
+                for prod in self.P.get(A, []):
+                    if all(symbol in SP for symbol in prod[0]):
+                        new_prods.append(prod)
+                if new_prods:
+                    P_prime[A] = new_prods
             self.N = N_prime
-            self.P = {A: prods for A, prods in P_prime.items() if prods}
+            self.P = P_prime
         else:
-            # Se o símbolo inicial não for produtivo, a linguagem é vazia
             print("L(G) = ∅")
             self.N = set()
             self.P = {}
