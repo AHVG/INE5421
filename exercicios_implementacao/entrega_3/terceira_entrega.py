@@ -13,16 +13,20 @@ class ContextFreeGrammar:
 
 
     def identify_non_terminal_epsilon(self):
-        E = set()  # Conjunto de ε-não-terminais
-        Q = {non_terminal for non_terminal in self.N if any(prod == [] for prod in self.P.get(non_terminal, []))}
-        
-        while Q:
-            # Atualiza Q com não-terminais que têm uma produção composta apenas por elementos de E
-            Q = {
-                X for X in self.N if X not in E and any((all(Y in E for Y in char) for char in prod) for prod in self.P.get(X, []))
-            }
-            E.update(Q)  # Adiciona elementos de Q ao conjunto E
-            
+        E = set()
+        while True:
+            # Q := {X | X ∈ N and X not in E and there exists a production X ::= Y1Y2...Yn with Y1, Y2, ..., Yn ∈ E}
+            Q = set()
+            for X in self.N:
+                if X not in E:
+                    for prod in self.P.get(X, []):
+                        if prod == [] or all(Y in E for Y in prod[0]):
+                            Q.add(X)
+                            break
+            # If Q is empty, no new symbols to add
+            if not Q:
+                break
+            E.update(Q)
         return E
 
 
@@ -30,9 +34,9 @@ class ContextFreeGrammar:
         """Elimina produções ε seguindo o algoritmo especificado."""
         # Passo 1: Identificar o conjunto E dos ε-não-terminais
         E = self.identify_non_terminal_epsilon()
+        print(E)
         # Passo 2: Construir P' sem as ε-produções
         P_prime = {A: [prod for prod in self.P.get(A, []) if prod != []] for A in self.P}
-
         # Passo 3: Adicionar produções alternativas removendo ε-não-terminais conforme necessário
         modified = True
         while modified:
@@ -40,25 +44,17 @@ class ContextFreeGrammar:
             for A in list(P_prime.keys()):
                 new_productions = []
                 for prod in P_prime[A]:
+                    tmp = prod[0]
                     # Para cada símbolo em `prod`, verificar se ele pertence a E
-                    for i, symbol in enumerate(prod):
+                    for i, symbol in enumerate(tmp):
                         if symbol in E:
                             # Cria uma nova produção com o símbolo removido
-                            new_prod = prod[:i] + prod[i+1:]
-                            if new_prod and new_prod not in P_prime[A]:
+                            new_prod = [tmp[:i] + tmp[i+1:]]
+                            # Adiciona a nova produção se ela não for vazia e não estiver na lista de produções
+                            if new_prod != [''] and new_prod not in P_prime[A]:
                                 new_productions.append(new_prod)
                                 modified = True
                 P_prime[A].extend(new_productions)
-
-        P_prime_tmp = P_prime
-        for non_terminal, prods in P_prime_tmp.items():
-            for prod in prods:
-                for char in prod[0]:
-                    # Se algum caractere representar um terminal em E e a produção ter mais de um caractere
-                    if char in E and len(prod[0]) > 1:
-                        production = prod[0]
-                        # Adiciona produção removendo variável anulável
-                        P_prime[non_terminal].append([production.replace(char, "")])
 
         # Passo 4: Adicionar produções para o novo símbolo inicial, se necessário
         if self.S in E:
@@ -126,9 +122,10 @@ class ContextFreeGrammar:
             for X in self.N:
                 if X not in SP:
                     for prod in self.P.get(X, []):
-                        if all(symbol in SP for symbol in prod[0]):
-                            Q.add(X)
-                            break
+                        if prod:
+                            if all(symbol in SP for symbol in prod[0]):
+                                Q.add(X)
+                                break
             # Até Q = ∅
             if not Q:
                 break
@@ -141,8 +138,9 @@ class ContextFreeGrammar:
             for A in N_prime:
                 new_prods = []
                 for prod in self.P.get(A, []):
-                    if all(symbol in SP for symbol in prod[0]):
-                        new_prods.append(prod)
+                    if prod:
+                        if all(symbol in SP for symbol in prod[0]):
+                            new_prods.append(prod)
                 if new_prods:
                     P_prime[A] = new_prods
             self.N = N_prime
@@ -151,6 +149,42 @@ class ContextFreeGrammar:
             print("L(G) = ∅")
             self.N = set()
             self.P = {}
+
+    def eliminate_unreachable_symbols(self):
+        """Elimina símbolos inalcançáveis da gramática."""
+        # SA := {S}
+        SA = {self.S}
+        # Repita
+        while True:
+            # M := {X | X ∈ N ∪ T e X não está em SA e existe produção Y ::= αXβ com Y ∈ SA}
+            M = set()
+            for Y in SA & self.N:
+                for prod in self.P.get(Y, []):
+                    if prod:
+                        for symbol in prod[0]:
+                            if symbol not in SA and (symbol in self.N or symbol in self.T):
+                                M.add(symbol)
+            # Até M = ∅
+            if not M:
+                break
+            SA.update(M)
+        # N' := SA ∩ N
+        self.N = SA & self.N
+        # T' := SA ∩ T
+        self.T = SA & self.T
+        # P' := {p | p ∈ P e todos os símbolos de p ∈ SA}
+        P_prime = {}
+        for A in self.N:
+            new_prods = []
+            for prod in self.P.get(A, []):
+                try:
+                    if all(symbol in SA for symbol in prod[0]):
+                        new_prods.append(prod)
+                except:
+                    new_prods.append([])
+            if new_prods:
+                P_prime[A] = new_prods
+        self.P = P_prime
 
 
 def parse_input(entrada):
@@ -178,10 +212,10 @@ def main():
     N,T,P,S = parse_input(vpl_input)
     cfg = ContextFreeGrammar(N,T,P,S)
     #print(cfg)
-    #cfg.eliminate_non_terminal_epsilon()
-    #cfg.eliminate_circular_productions()
-    #cfg.eliminate_unit_productions()
-    cfg.eliminate_unproductive_symbols()
+    cfg.eliminate_non_terminal_epsilon()
+    cfg.eliminate_circular_productions()
+    cfg.eliminate_unit_productions()
+    cfg.eliminate_unreachable_symbols()
     print(cfg)
 
 
