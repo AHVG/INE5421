@@ -20,9 +20,12 @@ class ContextFreeGrammar:
             for X in self.N:
                 if X not in E:
                     for prod in self.P.get(X, []):
-                        if prod == [] or all(Y in E for Y in prod[0]):
-                            Q.add(X)
-                            break
+                        if prod:
+                            if all(Y in E for Y in prod[0]):
+                                Q.add(X)
+                        else:
+                            if X != self.S:
+                                Q.add(X)
             # If Q is empty, no new symbols to add
             if not Q:
                 break
@@ -35,7 +38,7 @@ class ContextFreeGrammar:
         # Passo 1: Identificar o conjunto E dos ε-não-terminais
         E = self.identify_non_terminal_epsilon()
         # Passo 2: Construir P' sem as ε-produções
-        P_prime = {A: [prod for prod in self.P.get(A, []) if prod != []] for A in self.P}
+        P_prime = {A: [prod for prod in self.P.get(A, []) if prod != [] or (prod == [] and A == self.S)] for A in self.P}
         # Passo 3: Adicionar produções alternativas removendo ε-não-terminais conforme necessário
         modified = True
         while modified:
@@ -43,16 +46,17 @@ class ContextFreeGrammar:
             for A in list(P_prime.keys()):
                 new_productions = []
                 for prod in P_prime[A]:
-                    tmp = prod[0]
-                    # Para cada símbolo em `prod`, verificar se ele pertence a E
-                    for i, symbol in enumerate(tmp):
-                        if symbol in E:
-                            # Cria uma nova produção com o símbolo removido
-                            new_prod = [tmp[:i] + tmp[i+1:]]
-                            # Adiciona a nova produção se ela não for vazia e não estiver na lista de produções
-                            if new_prod != [''] and new_prod not in P_prime[A]:
-                                new_productions.append(new_prod)
-                                modified = True
+                    if prod:
+                        tmp = prod[0]
+                        # Para cada símbolo em `prod`, verificar se ele pertence a E
+                        for i, symbol in enumerate(tmp):
+                            if symbol in E:
+                                # Cria uma nova produção com o símbolo removido
+                                new_prod = [tmp[:i] + tmp[i+1:]]
+                                # Adiciona a nova produção se ela não for vazia e não estiver na lista de produções
+                                if new_prod != [''] and new_prod not in P_prime[A]:
+                                    new_productions.append(new_prod)
+                                    modified = True
                 P_prime[A].extend(new_productions)
 
         # Passo 4: Adicionar produções para o novo símbolo inicial, se necessário
@@ -235,7 +239,7 @@ class ContextFreeGrammar:
             if non_terminal == 'S':
                 non_terminals[0], non_terminals[i] = non_terminals[i], non_terminals[0]
 
-        non_terminals = ['S', "S'", 'B', 'A'] 
+        non_terminals = ['S', 'B', 'A'] 
         print(non_terminals)
         for i in range(len(non_terminals)):
             Ai = non_terminals[i]
@@ -250,9 +254,10 @@ class ContextFreeGrammar:
                             alpha = prod[0][1:]  # α
                             self.P[Ai].remove([tmp])  # Remove Ai ::= Aj α
                             for beta in self.P.get(Aj, []):
-                                beta_ = beta[0]
-                                new_prod = beta_ + alpha  # β α
-                                new_prods.append([new_prod])
+                                if beta:
+                                    beta_ = beta[0]
+                                    new_prod = beta_ + alpha  # β α
+                                    new_prods.append([new_prod])
                 self.P[Ai].extend(new_prods)
             # Elimina recursões diretas em Ai
             self.eliminate_direct_left_recursion(Ai)
@@ -282,10 +287,10 @@ def main():
     N,T,P,S = parse_input(vpl_input)
     cfg = ContextFreeGrammar(N,T,P,S)
     cfg.eliminate_non_terminal_epsilon()
-    cfg.eliminate_circular_productions()
-    cfg.eliminate_unit_productions()
-    cfg.eliminate_unreachable_symbols()
-    cfg.eliminate_left_recursion()
+    # cfg.eliminate_circular_productions()
+    # cfg.eliminate_unit_productions()
+    # cfg.eliminate_unreachable_symbols()
+    # cfg.eliminate_left_recursion()
 
     print(cfg)
 
