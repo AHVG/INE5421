@@ -1,5 +1,6 @@
 from sys import argv
 import re
+import copy
 
 class ContextFreeGrammar:
     def __init__(self, N, T, P, S):
@@ -87,7 +88,7 @@ class ContextFreeGrammar:
         self.P = P_prime
         self.S = S_prime
 
-        return ContextFreeGrammar(self.N, self.T, self.P, self.S)
+        return copy.deepcopy(self)
     
     def eliminate_circular_productions(self):
         for non_terminal in self.P:
@@ -97,7 +98,7 @@ class ContextFreeGrammar:
                 if not (len(prod) == 1 and prod[0] == non_terminal)
             ]
         
-        return ContextFreeGrammar(self.N, self.T, self.P, self.S)
+        return copy.deepcopy(self)
     
     def eliminate_unit_productions(self):
         P_prime = {}  # Novo conjunto de produções
@@ -127,6 +128,9 @@ class ContextFreeGrammar:
                             P_prime[A].append(prod)
 
         self.P = P_prime  # Atualiza P com o novo conjunto de produções P'
+        self.eliminate_unreachable_symbols()
+
+        return copy.deepcopy(self)
 
     def eliminate_unproductive_symbols(self):
         # SP := T
@@ -166,6 +170,8 @@ class ContextFreeGrammar:
             self.N = set()
             self.P = {}
 
+        return copy.deepcopy(self)
+
     def eliminate_unreachable_symbols(self):
         # SA := {S}
         SA = {self.S}
@@ -200,6 +206,8 @@ class ContextFreeGrammar:
             if new_prods:
                 P_prime[A] = new_prods
         self.P = P_prime
+
+        return copy.deepcopy(self)
 
     def eliminate_direct_left_recursion(self, non_terminal):
         prods = self.P.get(non_terminal, [])
@@ -250,7 +258,6 @@ class ContextFreeGrammar:
                 non_terminals[0], non_terminals[i] = non_terminals[i], non_terminals[0]
 
         non_terminals = ['S', 'B', 'A'] 
-        print(non_terminals)
         for i in range(len(non_terminals)):
             Ai = non_terminals[i]
             for j in range(i):
@@ -271,6 +278,8 @@ class ContextFreeGrammar:
                 self.P[Ai].extend(new_prods)
             # Elimina recursões diretas em Ai
             self.eliminate_direct_left_recursion(Ai)
+        
+        return copy.deepcopy(self)
 
 def parse_input(entrada):
     # Expressão regular para encontrar os quatro conjuntos no formato "{...}"
@@ -297,11 +306,9 @@ def main():
     cfg = ContextFreeGrammar(N,T,P,S)
     cfg.eliminate_non_terminal_epsilon()
     cfg.eliminate_circular_productions()
-    cfg.eliminate_unit_productions()
-    cfg.eliminate_unreachable_symbols()
-    cfg.eliminate_left_recursion()
-
-    print(cfg)
+    result1 = cfg.eliminate_unit_productions()
+    result2 = cfg.eliminate_left_recursion()
+    print(f"<<{result1}><{result2}>>")
 
 if __name__ == '__main__':
     main()
