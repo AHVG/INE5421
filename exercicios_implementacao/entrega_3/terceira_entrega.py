@@ -9,13 +9,28 @@ class ContextFreeGrammar:
         self.S = S  # Símbolo inicial
 
     def __str__(self):
-        return f"{self.N}; {self.T}; {self.S}; {self.P}"
+        # Formatar os conjuntos N, T e o símbolo inicial S
+        N_str = "{" + ",".join(sorted(self.N)) + "}"
+        T_str = "{" + ",".join(sorted(self.T)) + "}"
+        S_str = "{" + self.S + "}"
 
+        # Formatar as produções
+        P_str = ""
+        for A in sorted(self.P.keys()):
+            for prod in self.P[A]:
+                if prod:
+                    prod_str = "".join(prod)
+                else:
+                    prod_str = "&"
+                P_str += f"{A} = {prod_str}; "
+        P_str = P_str.strip()  # Remover o espaço extra no final
+
+        return f"{N_str}{T_str}{S_str}{{{P_str}}}"
 
     def identify_non_terminal_epsilon(self):
         E = set()
         while True:
-            # Q := {X | X ∈ N and X not in E and there exists a production X ::= Y1Y2...Yn with Y1, Y2, ..., Yn ∈ E}
+            # Q := {X | X ∈ N e X não está em E e existe uma produção X ::= Y1Y2...Yn com Y1, Y2, ..., Yn ∈ E}
             Q = set()
             for X in self.N:
                 if X not in E:
@@ -26,7 +41,7 @@ class ContextFreeGrammar:
                         else:
                             if X != self.S:
                                 Q.add(X)
-            # If Q is empty, no new symbols to add
+            # Se Q for vazio, não há novos símbolos para adicionar
             if not Q:
                 break
             E.update(Q)
@@ -34,12 +49,11 @@ class ContextFreeGrammar:
 
 
     def eliminate_non_terminal_epsilon(self):
-        """Elimina produções ε seguindo o algoritmo especificado."""
-        # Passo 1: Identificar o conjunto E dos ε-não-terminais
+        # Identificar o conjunto E dos ε-não-terminais
         E = self.identify_non_terminal_epsilon()
-        # Passo 2: Construir P' sem as ε-produções
+        # Construir P' sem as ε-produções
         P_prime = {A: [prod for prod in self.P.get(A, []) if prod != [] or (prod == [] and A == self.S)] for A in self.P}
-        # Passo 3: Adicionar produções alternativas removendo ε-não-terminais conforme necessário
+        # Adicionar produções alternativas removendo ε-não-terminais conforme necessário
         modified = True
         while modified:
             modified = False
@@ -59,7 +73,7 @@ class ContextFreeGrammar:
                                     modified = True
                 P_prime[A].extend(new_productions)
 
-        # Passo 4: Adicionar produções para o novo símbolo inicial, se necessário
+        # Adicionar produções para o novo símbolo inicial, se necessário
         if self.S in E:
             S_prime = self.S + "'"  # Novo símbolo inicial S'
             P_prime[S_prime] = [[self.S], []]
@@ -88,7 +102,7 @@ class ContextFreeGrammar:
     def eliminate_unit_productions(self):
         P_prime = {}  # Novo conjunto de produções
 
-        # Passo 1: Construir NA para cada A ∈ N
+        # Construir NA para cada A ∈ N
         N_A = {A: {A} for A in self.N}
         
         # Expande N_A para incluir todos os não-terminais alcançáveis por produções unitárias
@@ -103,7 +117,7 @@ class ContextFreeGrammar:
                             N_A[A].add(C)
                             queue.append(C)
 
-        # Passo 2: Construir P' sem as produções unitárias
+        # Construir P' sem as produções unitárias
         for A in self.N:
             P_prime[A] = []
             for B in N_A[A]:
@@ -115,7 +129,6 @@ class ContextFreeGrammar:
         self.P = P_prime  # Atualiza P com o novo conjunto de produções P'
 
     def eliminate_unproductive_symbols(self):
-        """Elimina símbolos improdutivos da gramática."""
         # SP := T
         SP = set(self.T)
         # Repita
@@ -154,7 +167,6 @@ class ContextFreeGrammar:
             self.P = {}
 
     def eliminate_unreachable_symbols(self):
-        """Elimina símbolos inalcançáveis da gramática."""
         # SA := {S}
         SA = {self.S}
         # Repita
@@ -190,7 +202,6 @@ class ContextFreeGrammar:
         self.P = P_prime
 
     def eliminate_direct_left_recursion(self, non_terminal):
-        """Elimina recursões diretas à esquerda nas produções."""
         prods = self.P.get(non_terminal, [])
         alpha_prods = []  # A ::= Aα
         beta_prods = []   # A ::= β
@@ -199,40 +210,39 @@ class ContextFreeGrammar:
             if prod:
                 tmp = prod[0]
                 if len(tmp) > 0 and tmp[0] == non_terminal:
-                    # Left-recursive production
-                    alpha_prods.append([tmp[1:]])  # Remove the leading A
+                    # Produção recursiva à esquerda
+                    alpha_prods.append([tmp[1:]])  # Remove A do início da produção
                 else:
-                    # Non-left-recursive production
+                    # Produção não-recursiva à esquerda
                     beta_prods.append([tmp])
 
         if alpha_prods:
-            # Create new non-terminal A'
+            # Cria um novo não-terminal para lidar com a recursão à esquerda
             new_non_terminal = non_terminal + "'"
             while new_non_terminal in self.N or new_non_terminal in self.T:
                 new_non_terminal += "'"
             self.N.add(new_non_terminal)
 
-            # Update productions for A
+            # Atualiza produções para A
             self.P[non_terminal] = []
             for beta in beta_prods:
                 if beta:
                     self.P[non_terminal].append([beta[0] + new_non_terminal])
                 else:
-                    # Handle epsilon in beta productions
+                    # Lida com epsilon em produções beta
                     self.P[non_terminal].append([new_non_terminal])
 
-            # Productions for A'
+            # Produções para A'
             self.P[new_non_terminal] = []
             for alpha in alpha_prods:
                 self.P[new_non_terminal].append([alpha[0] + new_non_terminal])
-            # Add epsilon production to A'
+            # Adiciona epsilon produção para A'
             self.P[new_non_terminal].append([])
         else:
-            # No direct left recursion
+            # Sem recursão direta à esquerda
             self.P[non_terminal] = prods
     
     def eliminate_left_recursion(self):
-        """Elimina recursões à esquerda (diretas e indiretas) nas produções."""
         # Colocar os não-terminais em uma ordem fixa
         non_terminals = list(self.N)
         for i, non_terminal in enumerate(non_terminals):
@@ -281,7 +291,6 @@ def parse_input(entrada):
 
     return N, T, P, S
 
-
 def main():
     vpl_input = argv[1] # **Não remover essa linha**, ela é responsável por receber a string de entrada do VPL
     N,T,P,S = parse_input(vpl_input)
@@ -293,7 +302,6 @@ def main():
     cfg.eliminate_left_recursion()
 
     print(cfg)
-
 
 if __name__ == '__main__':
     main()
