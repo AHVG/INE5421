@@ -249,15 +249,29 @@ class ContextFreeGrammar:
         else:
             # Sem recursão direta à esquerda
             self.P[non_terminal] = prods
+
+    def bfs_non_terminals(self):
+        """Realiza uma busca em largura para determinar a ordem dos não-terminais."""
+        visited = set()
+        queue = [self.S]  # Usar uma lista normal como fila
+        order = []
+
+        while queue:
+            current = queue.pop(0)  # Remove o primeiro elemento da lista
+            if current not in visited:
+                visited.add(current)
+                order.append(current)
+                for prod in self.P.get(current, []):
+                    if prod:
+                        tmp = prod[0]
+                        for symbol in tmp:
+                            if symbol in self.N and symbol not in visited:
+                                queue.append(symbol)
+
+        return order
     
     def eliminate_left_recursion(self):
-        # Colocar os não-terminais em uma ordem fixa
-        non_terminals = list(self.N)
-        for i, non_terminal in enumerate(non_terminals):
-            if non_terminal == 'S':
-                non_terminals[0], non_terminals[i] = non_terminals[i], non_terminals[0]
-
-        non_terminals = ['S', 'B', 'A'] 
+        non_terminals = self.bfs_non_terminals()
         for i in range(len(non_terminals)):
             Ai = non_terminals[i]
             for j in range(i):
