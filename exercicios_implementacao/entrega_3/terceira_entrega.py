@@ -34,7 +34,6 @@ class ContextFreeGrammar:
         """Elimina produções ε seguindo o algoritmo especificado."""
         # Passo 1: Identificar o conjunto E dos ε-não-terminais
         E = self.identify_non_terminal_epsilon()
-        print(E)
         # Passo 2: Construir P' sem as ε-produções
         P_prime = {A: [prod for prod in self.P.get(A, []) if prod != []] for A in self.P}
         # Passo 3: Adicionar produções alternativas removendo ε-não-terminais conforme necessário
@@ -186,6 +185,77 @@ class ContextFreeGrammar:
                 P_prime[A] = new_prods
         self.P = P_prime
 
+    def eliminate_direct_left_recursion(self, non_terminal):
+        """Elimina recursões diretas à esquerda nas produções."""
+        prods = self.P.get(non_terminal, [])
+        alpha_prods = []  # A ::= Aα
+        beta_prods = []   # A ::= β
+
+        for prod in prods:
+            if prod:
+                tmp = prod[0]
+                if len(tmp) > 0 and tmp[0] == non_terminal:
+                    # Left-recursive production
+                    alpha_prods.append([tmp[1:]])  # Remove the leading A
+                else:
+                    # Non-left-recursive production
+                    beta_prods.append([tmp])
+
+        if alpha_prods:
+            # Create new non-terminal A'
+            new_non_terminal = non_terminal + "'"
+            while new_non_terminal in self.N or new_non_terminal in self.T:
+                new_non_terminal += "'"
+            self.N.add(new_non_terminal)
+
+            # Update productions for A
+            self.P[non_terminal] = []
+            for beta in beta_prods:
+                if beta:
+                    self.P[non_terminal].append([beta[0] + new_non_terminal])
+                else:
+                    # Handle epsilon in beta productions
+                    self.P[non_terminal].append([new_non_terminal])
+
+            # Productions for A'
+            self.P[new_non_terminal] = []
+            for alpha in alpha_prods:
+                self.P[new_non_terminal].append([alpha[0] + new_non_terminal])
+            # Add epsilon production to A'
+            self.P[new_non_terminal].append([])
+        else:
+            # No direct left recursion
+            self.P[non_terminal] = prods
+    
+    def eliminate_left_recursion(self):
+        """Elimina recursões à esquerda (diretas e indiretas) nas produções."""
+        # Colocar os não-terminais em uma ordem fixa
+        non_terminals = list(self.N)
+        for i, non_terminal in enumerate(non_terminals):
+            if non_terminal == 'S':
+                non_terminals[0], non_terminals[i] = non_terminals[i], non_terminals[0]
+
+        non_terminals = ['S', "S'", 'B', 'A'] 
+        print(non_terminals)
+        for i in range(len(non_terminals)):
+            Ai = non_terminals[i]
+            for j in range(i):
+                Aj = non_terminals[j]
+                new_prods = []
+                # Substitui Ai ::= Aj α por Ai ::= β α, onde Aj ::= β
+                for prod in self.P.get(Ai, []):
+                    if prod:
+                        tmp = prod[0]
+                        if len(tmp) > 0 and tmp[0] == Aj:
+                            alpha = prod[0][1:]  # α
+                            self.P[Ai].remove([tmp])  # Remove Ai ::= Aj α
+                            for beta in self.P.get(Aj, []):
+                                beta_ = beta[0]
+                                new_prod = beta_ + alpha  # β α
+                                new_prods.append([new_prod])
+                self.P[Ai].extend(new_prods)
+            # Elimina recursões diretas em Ai
+            self.eliminate_direct_left_recursion(Ai)
 
 def parse_input(entrada):
     # Expressão regular para encontrar os quatro conjuntos no formato "{...}"
@@ -211,11 +281,12 @@ def main():
     vpl_input = argv[1] # **Não remover essa linha**, ela é responsável por receber a string de entrada do VPL
     N,T,P,S = parse_input(vpl_input)
     cfg = ContextFreeGrammar(N,T,P,S)
-    #print(cfg)
     cfg.eliminate_non_terminal_epsilon()
     cfg.eliminate_circular_productions()
     cfg.eliminate_unit_productions()
     cfg.eliminate_unreachable_symbols()
+    cfg.eliminate_left_recursion()
+
     print(cfg)
 
 
