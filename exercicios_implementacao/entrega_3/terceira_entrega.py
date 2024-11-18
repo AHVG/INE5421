@@ -287,10 +287,10 @@ def main():
     N,T,P,S = parse_input(vpl_input)
     cfg = ContextFreeGrammar(N,T,P,S)
     cfg.eliminate_non_terminal_epsilon()
-    # cfg.eliminate_circular_productions()
-    # cfg.eliminate_unit_productions()
-    # cfg.eliminate_unreachable_symbols()
-    # cfg.eliminate_left_recursion()
+    cfg.eliminate_circular_productions()
+    cfg.eliminate_unit_productions()
+    cfg.eliminate_unreachable_symbols()
+    cfg.eliminate_left_recursion()
 
     print(cfg)
 
