@@ -16,15 +16,15 @@ class ContextFreeGrammar:
         S_str = "{" + self.S + "}"
 
         # Formatar as produções
-        P_str = ""
+        producoes = []
         for A in sorted(self.P.keys()):
             for prod in self.P[A]:
                 if prod:
                     prod_str = "".join(prod)
                 else:
                     prod_str = "&"
-                P_str += f"{A} = {prod_str}; "
-        P_str = P_str.strip()  # Remover o espaço extra no final
+                producoes.append(f"{A} = {prod_str}")
+        P_str = "; ".join(producoes)  # Junta as produções com "; "
 
         return f"{N_str}{T_str}{S_str}{{{P_str}}}"
 
@@ -40,8 +40,7 @@ class ContextFreeGrammar:
                             if all(Y in E for Y in prod[0]):
                                 Q.add(X)
                         else:
-                            if X != self.S:
-                                Q.add(X)
+                            Q.add(X)
             # Se Q for vazio, não há novos símbolos para adicionar
             if not Q:
                 break
@@ -50,31 +49,27 @@ class ContextFreeGrammar:
 
 
     def eliminate_non_terminal_epsilon(self):
-        # Identificar o conjunto E dos ε-não-terminais
+        # Identifica o conjunto E dos ε-não-terminais
         E = self.identify_non_terminal_epsilon()
-        # Construir P' sem as ε-produções
-        P_prime = {A: [prod for prod in self.P.get(A, []) if prod != [] or (prod == [] and A == self.S)] for A in self.P}
-        # Adicionar produções alternativas removendo ε-não-terminais conforme necessário
+        # Constrói P' sem as ε-produções
+        P_prime = {A: [prod for prod in self.P.get(A, []) if prod != []] for A in self.P}
+        # Adiciona produções alternativas removendo ε-não-terminais conforme necessário
         modified = True
         while modified:
             modified = False
             for A in list(P_prime.keys()):
                 new_productions = []
                 for prod in P_prime[A]:
-                    if prod:
-                        tmp = prod[0]
-                        # Para cada símbolo em `prod`, verificar se ele pertence a E
-                        for i, symbol in enumerate(tmp):
-                            if symbol in E:
-                                # Cria uma nova produção com o símbolo removido
-                                new_prod = [tmp[:i] + tmp[i+1:]]
-                                # Adiciona a nova produção se ela não for vazia e não estiver na lista de produções
-                                if new_prod != [''] and new_prod not in P_prime[A]:
-                                    new_productions.append(new_prod)
-                                    modified = True
+                    # Para cada símbolo em `prod`, verificar se ele pertence a E
+                    for i, symbol in enumerate(prod):
+                        if symbol in E:
+                            # Cria uma nova produção com o símbolo removido
+                            new_prod = prod[:i] + prod[i+1:]
+                            if new_prod and new_prod not in P_prime[A]:
+                                new_productions.append(new_prod)
+                                modified = True
                 P_prime[A].extend(new_productions)
-
-        # Adicionar produções para o novo símbolo inicial, se necessário
+        # Adiciona produções para o novo símbolo inicial, se necessário
         if self.S in E:
             S_prime = self.S + "'"  # Novo símbolo inicial S'
             P_prime[S_prime] = [[self.S], []]
@@ -118,7 +113,7 @@ class ContextFreeGrammar:
                             N_A[A].add(C)
                             queue.append(C)
 
-        # Construir P' sem as produções unitárias
+        # Constrói P' sem as produções unitárias
         for A in self.N:
             P_prime[A] = []
             for B in N_A[A]:
@@ -166,46 +161,19 @@ class ContextFreeGrammar:
             self.N = N_prime
             self.P = P_prime
         else:
-            print("L(G) = ∅")
+            # print("L(G) = ∅")
             self.N = set()
             self.P = {}
 
         return copy.deepcopy(self)
 
     def eliminate_unreachable_symbols(self):
-        # SA := {S}
-        SA = {self.S}
-        # Repita
-        while True:
-            # M := {X | X ∈ N ∪ T e X não está em SA e existe produção Y ::= αXβ com Y ∈ SA}
-            M = set()
-            for Y in SA & self.N:
-                for prod in self.P.get(Y, []):
-                    if prod:
-                        for symbol in prod[0]:
-                            if symbol not in SA and (symbol in self.N or symbol in self.T):
-                                M.add(symbol)
-            # Até M = ∅
-            if not M:
-                break
-            SA.update(M)
-        # N' := SA ∩ N
-        self.N = SA & self.N
-        # T' := SA ∩ T
-        self.T = SA & self.T
-        # P' := {p | p ∈ P e todos os símbolos de p ∈ SA}
-        P_prime = {}
-        for A in self.N:
-            new_prods = []
-            for prod in self.P.get(A, []):
-                try:
-                    if all(symbol in SA for symbol in prod[0]):
-                        new_prods.append(prod)
-                except:
-                    new_prods.append([])
-            if new_prods:
-                P_prime[A] = new_prods
-        self.P = P_prime
+        # Elimina símbolos não-terminais inalcançáveis, a partir do bfs
+        non_terminals = self.bfs_non_terminals()
+        for non_teminal in list(self.N):
+            if non_teminal not in non_terminals:
+                self.N.remove(non_teminal)
+                self.P.pop(non_teminal)
 
         return copy.deepcopy(self)
 
@@ -251,25 +219,32 @@ class ContextFreeGrammar:
             self.P[non_terminal] = prods
 
     def bfs_non_terminals(self):
-        """Realiza uma busca em largura para determinar a ordem dos não-terminais."""
-        visited = set()
-        queue = [self.S]  # Usar uma lista normal como fila
-        order = []
+        # Função auxiliar para dividir uma produção em símbolos
+        def split_production(production_str):
+            pattern = r"[A-Z]'+|[A-Z]|[a-z]|\S"
+            symbols = re.findall(pattern, production_str)
+            return symbols
 
+        visited = set()
+        queue = [self.S]
+        order = []
+        # BFS para visitar todos os não-terminais
         while queue:
-            current = queue.pop(0)  # Remove o primeiro elemento da lista
+            current = queue.pop(0)
             if current not in visited:
                 visited.add(current)
                 order.append(current)
                 for prod in self.P.get(current, []):
                     if prod:
-                        tmp = prod[0]
-                        for symbol in tmp:
+                        prod_str = ''.join(prod)
+                        symbols = split_production(prod_str)
+                        for symbol in symbols:
+                            
                             if symbol in self.N and symbol not in visited:
                                 queue.append(symbol)
 
         return order
-    
+        
     def eliminate_left_recursion(self):
         non_terminals = self.bfs_non_terminals()
         for i in range(len(non_terminals)):
@@ -292,6 +267,7 @@ class ContextFreeGrammar:
                 self.P[Ai].extend(new_prods)
             # Elimina recursões diretas em Ai
             self.eliminate_direct_left_recursion(Ai)
+        #self.eliminate_unreachable_symbols()
         
         return copy.deepcopy(self)
 
@@ -311,16 +287,13 @@ def parse_input(entrada):
             P[esquerda] = []
         # Cada produção à direita é separada por espaços para formar a lista de símbolos
         P[esquerda].append([simbolo for simbolo in direita.split() if simbolo != '&'])
-
     return N, T, P, S
 
 def main():
     vpl_input = argv[1] # **Não remover essa linha**, ela é responsável por receber a string de entrada do VPL
     N,T,P,S = parse_input(vpl_input)
     cfg = ContextFreeGrammar(N,T,P,S)
-    cfg.eliminate_non_terminal_epsilon()
-    cfg.eliminate_circular_productions()
-    result1 = cfg.eliminate_unit_productions()
+    result1 = cfg.eliminate_non_terminal_epsilon().eliminate_circular_productions().eliminate_unit_productions()
     result2 = cfg.eliminate_left_recursion()
     print(f"<<{result1}><{result2}>>")
 
