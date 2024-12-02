@@ -1,141 +1,133 @@
 import sys
 import re
 
-def parse_input(vpl_input):
-    """Parsa a entrada e retorna os componentes da gramática."""
-    # Expressão regular para encontrar os quatro conjuntos no formato "{...}"
-    sets = re.findall(r"\{(.*?)\}", vpl_input)
-    N = sets[0].split(',')          # Não-terminais
-    T = sets[1].split(',')          # Terminais
-    S = sets[2]                     # Símbolo inicial
-    productions_raw = sets[3].split(';')  # Produções
+class IOHandler:
+    @staticmethod
+    def parse_input(vpl_input):
+        # Expressão regular para encontrar os quatro conjuntos no formato "{...}"
+        sets = re.findall(r"\{(.*?)\}", vpl_input)
+        N = sets[0].split(',')          # Não-terminais
+        T = sets[1].split(',')          # Terminais
+        S = sets[2]                     # Símbolo inicial
+        productions_raw = sets[3].split(';')  # Produções
 
-    # Processa as produções
-    P = {}
-    for prod in productions_raw:
-        if '=' in prod:
-            left, right = [s.strip() for s in prod.split('=')]
-            if left not in P:
-                P[left] = []
-            # Adiciona o lado direito como uma lista contendo a string inteira
-            right_side = right.strip()
-            if right_side == '&':
-                P[left].append(['&'])
-            else:
-                P[left].append([right_side])
-    return N, T, P, S
-
-def compute_first(N, T, P):
-    """Calcula o conjunto First para cada não-terminal."""
-    first = {non_terminal: set() for non_terminal in N}
-    changed = True
-    while changed:
-        changed = False
-        for A in N:
-            for production in P.get(A, []):
-                if production == ['&']:
-                    if '&' not in first[A]:
-                        first[A].add('&')
-                        changed = True
+        # Processa as produções
+        P = {}
+        for prod in productions_raw:
+            if '=' in prod:
+                left, right = [s.strip() for s in prod.split('=')]
+                if left not in P:
+                    P[left] = []
+                # Adiciona o lado direito como uma lista contendo a string inteira
+                right_side = right.strip()
+                if right_side == '&':
+                    P[left].append(['&'])  
                 else:
-                    for symbol_ in production:
-                        if symbol_:
-                            for symbol in symbol_:
-                                if symbol in T:
-                                    if symbol not in first[A]:
-                                        first[A].add(symbol)
-                                        changed = True
-                                    break  # Não precisa continuar após encontrar um terminal
-                                elif symbol in N:
-                                    # Antes de atualizar, verificamos se há novos elementos para adicionar
-                                    new_elements = first[symbol] - set('&')
-                                    if not new_elements.issubset(first[A]):
-                                        first[A].update(new_elements)
-                                        changed = True
-                                    if '&' in first[symbol]:
-                                        # Continua para o próximo símbolo na produção
-                                        continue
-                                    else:
-                                        break  # Não adiciona '&' e não continua
-                                else:
-                                    break
-                            else:
-                                break
-                    else:
-                        # Se percorrer toda a produção sem 'break', adiciona '&'
-                        if '&' not in first[A]:
-                            first[A].add('&')
-                            changed = True
-    return first
+                    P[left].append([right_side])  
+        return N, T, P, S
+    
+    @staticmethod
+    def format_output(N, first, follow):
+        first_output = []
+        follow_output = []
+        for non_terminal in N:
+            first_set = ', '.join(sorted(first[non_terminal]))
+            follow_set = ', '.join(sorted(follow[non_terminal]))
+            first_output.append(f"First({non_terminal}) = {{{first_set}}}")
+            follow_output.append(f"Follow({non_terminal}) = {{{follow_set}}}")
+        output = '; '.join(first_output + follow_output)
+        return output
 
-def compute_follow(N, T, P, S, first):
-    """Calcula o conjunto Follow para cada não-terminal."""
-    follow = {non_terminal: set() for non_terminal in N}
-    follow[S].add('$')  # Adiciona o símbolo de fim de entrada ao Follow(S)
-    changed = True
-    while changed:
-        changed = False
-        for A in N:
-            for production in P.get(A, []):
-                production_str = ''.join(production)
-                for idx in range(len(production_str)):
-                    B = production_str[idx]
-                    if B in N:
-                        beta = production_str[idx+1:]
-                        # Calcula First(beta)
-                        first_beta = set()
-                        if beta:
-                            nullable = True
-                            for symbol in beta:
-                                if symbol in T:
-                                    first_beta.add(symbol)
-                                    nullable = False
-                                    break
-                                elif symbol in N:
-                                    first_beta.update(first[symbol] - set('&'))
-                                    if '&' in first[symbol]:
-                                        continue
-                                    else:
-                                        nullable = False
-                                        break
-                                else:
-                                    nullable = False
-                                    break
-                            if nullable:
-                                first_beta.add('&')
-                        else:
-                            first_beta.add('&')
-                        # Adiciona First(beta) - {&} ao Follow(B)
-                        before = len(follow[B])
-                        follow[B].update(first_beta - set('&'))
-                        after = len(follow[B])
-                        if after > before:
-                            changed = True
-                        # Se First(beta) contém &, adiciona Follow(A) ao Follow(B)
-                        if '&' in first_beta:
-                            before = len(follow[B])
-                            follow[B].update(follow[A])
-                            after = len(follow[B])
-                            if after > before:
+class ContextFreeGrammar:
+    def __init__(self, N, T, P, S):
+        self.N = N  # Conjunto de não-terminais
+        self.T = T  # Conjunto de terminais
+        self.P = P  # Produções
+        self.S = S  # Símbolo inicial
+
+    def compute_first(self):
+        first = {symbol: set() for symbol in self.N}  # Inicializa FIRST para cada não-terminal
+        for terminal in self.T:
+            first[terminal] = {terminal}  # FIRST de um terminal é ele mesmo
+        
+        changed = True
+        while changed:
+            changed = False
+            for X in self.N:
+                for production_ in self.P[X]:
+                    if production_:
+                        production = production_[0]
+                        if production == '&':  # Regra para epsilon
+                            if '&' not in first[X]:
+                                first[X].add('&')
                                 changed = True
-        return follow
+                        else:
+                            for symbol in production:
+                                before = len(first[X])
+                                first[X].update(first[symbol] - {'&'})  # Adiciona FIRST do símbolo
+                                if '&' not in first[symbol]:
+                                    break  # Interrompe se não há epsilon
+                                if symbol == production[-1]:
+                                    first[X].add('&')  # Adiciona epsilon se necessário
+                                after = len(first[X])
+                                if after > before:
+                                    changed = True
+        return first
 
-def format_output(N, first, follow):
-    """Formata a saída conforme especificado."""
-    output = []
-    for non_terminal in N:
-        first_set = ', '.join(sorted(first[non_terminal]))
-        follow_set = ', '.join(sorted(follow[non_terminal]))
-        output.append(f"First({non_terminal}) = {{{first_set}}}; Follow({non_terminal}) = {{{follow_set}}};")
-    return ' '.join(output)
+    def compute_follow(self):
+        follow = {A: set() for A in self.N}  # Inicializa FOLLOW para cada não-terminal
+        follow[self.S].add('$')  # Adiciona $ ao FOLLOW do símbolo inicial
+        first = self.compute_first()  # Calcula FIRST para auxiliar
+
+        changed = True
+        while changed:
+            changed = False
+            for A in self.N:
+                for production_ in self.P[A]:
+                    if production_:
+                        production = production_[0]
+                        for i, B in enumerate(production):
+                            if B in self.N:
+                                beta = production[i+1:]
+                                if beta:
+                                    # Se beta não é vazio
+                                    first_beta = set()
+                                    for symbol in beta:
+                                        first_beta.update(first[symbol] - {'&'})
+                                        if '&' not in first[symbol]:
+                                            break
+                                    else:
+                                        if '&' in first[beta[-1]]:
+                                            first_beta.add('&')
+                                    before = len(follow[B])
+                                    follow[B].update(first_beta - {'&'})  # Atualiza FOLLOW(B)
+                                    after = len(follow[B])
+                                    if after > before:
+                                        changed = True
+                                    # Se FIRST(beta) contém epsilon
+                                    if all('&' in first[symbol] for symbol in beta):
+                                        before = len(follow[B])
+                                        follow[B].update(follow[A])  # Adiciona FOLLOW(A) a FOLLOW(B)
+                                        after = len(follow[B])
+                                        if after > before:
+                                            changed = True
+                                else:
+                                    # Beta é vazio
+                                    before = len(follow[B])
+                                    follow[B].update(follow[A])  # Adiciona FOLLOW(A) a FOLLOW(B)
+                                    after = len(follow[B])
+                                    if after > before:
+                                        changed = True
+        return follow
 
 def main():
     vpl_input = sys.argv[1]  # **Não remover esta linha**, ela recebe a string de entrada do VPL
-    N, T, P, S = parse_input(vpl_input)
-    first = compute_first(N, T, P)
-    follow = compute_follow(N, T, P, S, first)
-    output = format_output(N, first, follow)
-    print(output)
+    N, T, P, S = IOHandler.parse_input(vpl_input)  # Parsing da entrada
+    cfg = ContextFreeGrammar(N, T, P, S)  
+    first = cfg.compute_first()  # Computa o conjunto FIRST
+    follow = cfg.compute_follow()  # Computa o conjunto FOLLOW
+    output = IOHandler.format_output(N, first, follow)  # Formata a saída
+    print(output)  # Imprime o resultado
 
 if __name__ == "__main__":
     main()
