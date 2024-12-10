@@ -62,16 +62,20 @@ class ContextFreeGrammar:
                                 first[X].add('&')
                                 changed = True
                         else:
+                            symbol_ = ""
                             for symbol in production:
-                                before = len(first[X])
-                                first[X].update(first[symbol] - {'&'})  # Adiciona FIRST do símbolo
-                                if '&' not in first[symbol]:
-                                    break  # Interrompe se não há epsilon
-                                if symbol == production[-1]:
-                                    first[X].add('&')  # Adiciona epsilon se necessário
-                                after = len(first[X])
-                                if after > before:
-                                    changed = True
+                                symbol_ += symbol
+                                if symbol_ in self.T or symbol_ in self.N:
+                                    before = len(first[X])
+                                    first[X].update(first[symbol_] - {'&'})  # Adiciona FIRST do símbolo
+                                    if '&' not in first[symbol_]:
+                                        break  # Interrompe se não há epsilon
+                                    if symbol_ == production[-1]:
+                                        first[X].add('&')  # Adiciona epsilon se necessário
+                                    after = len(first[X])
+                                    if after > before:
+                                        changed = True
+                                    symbol_ = ""
         return first
 
     def compute_follow(self):
@@ -92,12 +96,22 @@ class ContextFreeGrammar:
                                 if beta:
                                     # Se beta não é vazio
                                     first_beta = set()
+                                    symbol_ = ""
                                     for symbol in beta:
-                                        first_beta.update(first[symbol] - {'&'})
-                                        if '&' not in first[symbol]:
-                                            break
+                                        symbol_ += symbol
+                                        if symbol_ in self.T or symbol_ in self.N:
+                                            first_beta.update(first[symbol_] - {'&'})
+                                            if '&' not in first[symbol_]:
+                                                break
+                                            symbol_ = ""
                                     else:
-                                        if '&' in first[beta[-1]]:
+                                        last_beta = ""
+                                        for i in range(1, len(beta) + 1):
+                                            last_beta = beta[-i:]
+                                            if last_beta in first.keys():
+                                                print(last_beta, self.T, self.N)
+                                                break
+                                        if '&' in first[last_beta]:
                                             first_beta.add('&')
                                     before = len(follow[B])
                                     follow[B].update(first_beta - {'&'})  # Atualiza FOLLOW(B)
@@ -105,9 +119,19 @@ class ContextFreeGrammar:
                                     if after > before:
                                         changed = True
                                     # Se FIRST(beta) contém epsilon
-                                    if all('&' in first[symbol] for symbol in beta):
+                                    all_nullable = True
+                                    symbol_ = ""  
+                                    for symbol in beta:
+                                        symbol_ += symbol
+                                        if symbol_ in first.keys():
+                                            if '&' not in first[symbol_]:
+                                                all_nullable = False  
+                                                break
+                                            symbol_ = "" 
+                                    # Se FIRST(beta) contém epsilon
+                                    if all_nullable:
                                         before = len(follow[B])
-                                        follow[B].update(follow[A])  # Adiciona FOLLOW(A) a FOLLOW(B)
+                                        follow[B].update(follow[A])  
                                         after = len(follow[B])
                                         if after > before:
                                             changed = True
