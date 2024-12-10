@@ -69,7 +69,7 @@ class ContextFreeGrammar:
                             symbol_ = ""
                             for symbol in production:
                                 symbol_ += symbol
-                                if symbol_ in self.T:
+                                if symbol_ in self.T or symbol_ in self.N:
                                     before = len(first[X])
                                     first[X].update(first[symbol_] - {'&'})  # Adiciona FIRST do símbolo
                                     if '&' not in first[symbol_]:
@@ -80,7 +80,6 @@ class ContextFreeGrammar:
                                     if after > before:
                                         changed = True
                                     symbol_ = ""
-
         return first
 
     def compute_follow(self):
@@ -101,12 +100,21 @@ class ContextFreeGrammar:
                                 if beta:
                                     # Se beta não é vazio
                                     first_beta = set()
+                                    symbol_ = ""
                                     for symbol in beta:
-                                        first_beta.update(first[symbol] - {'&'})
-                                        if '&' not in first[symbol]:
-                                            break
+                                        symbol_ += symbol
+                                        if symbol_ in self.T or symbol_ in self.N:
+                                            first_beta.update(first[symbol_] - {'&'})
+                                            if '&' not in first[symbol_]:
+                                                break
+                                            symbol_ = ""
                                     else:
-                                        if '&' in first[beta[-1]]:
+                                        last_beta = ""
+                                        for i in range(1, len(beta) + 1):
+                                            last_beta = beta[-i:]
+                                            if last_beta in first.keys():
+                                                break
+                                        if '&' in first[last_beta]:
                                             first_beta.add('&')
                                     before = len(follow[B])
                                     follow[B].update(first_beta - {'&'})  # Atualiza FOLLOW(B)
@@ -114,14 +122,19 @@ class ContextFreeGrammar:
                                     if after > before:
                                         changed = True
                                     # Se FIRST(beta) contém epsilon
-                                    all_have_epsilon = True
+                                    all_nullable = True
+                                    symbol_ = ""  
                                     for symbol in beta:
-                                        if '&' not in first[symbol]:
-                                            all_have_epsilon = False
-                                            break
-                                    if all_have_epsilon:
+                                        symbol_ += symbol
+                                        if symbol_ in first.keys():
+                                            if '&' not in first[symbol_]:
+                                                all_nullable = False  
+                                                break
+                                            symbol_ = "" 
+                                    # Se FIRST(beta) contém epsilon
+                                    if all_nullable:
                                         before = len(follow[B])
-                                        follow[B].update(follow[A])  # Adiciona FOLLOW(A) a FOLLOW(B)
+                                        follow[B].update(follow[A])  
                                         after = len(follow[B])
                                         if after > before:
                                             changed = True
@@ -149,23 +162,29 @@ class ContextFreeGrammar:
                         parsing_table[key] = production
                 else:
                     first_set = set()
-                    for symbol in production:
-                        first_set.update(first[symbol])
-                        if '&' not in first[symbol]:
-                            break
-                    else:
-                        first_set.add('&')
-                    for terminal in first_set - {'&'}:
-                        key = (A, terminal)
-                        if key in parsing_table:
-                            is_ll1 = False
-                        parsing_table[key] = production
-                    if '&' in first_set:
-                        for b in follow[A]:
-                            key = (A, b)
+                    production_ = production[0]
+                    if production_:
+                        symbol_ = ""
+                        for symbol in production_:
+                            symbol_ += symbol
+                            if symbol_ in self.T or symbol_ in self.N:
+                                first_set.update(first[symbol_])
+                                if '&' not in first[symbol_]:
+                                    break
+                                symbol_ = ""
+                        else:
+                            first_set.add('&')
+                        for terminal in first_set - {'&'}:
+                            key = (A, terminal)
                             if key in parsing_table:
                                 is_ll1 = False
-                            parsing_table[key] = production
+                            parsing_table[key] = production_
+                        if '&' in first_set:
+                            for b in follow[A]:
+                                key = (A, b)
+                                if key in parsing_table:
+                                    is_ll1 = False
+                                parsing_table[key] = production_
         return parsing_table, is_ll1
 
 def main():
