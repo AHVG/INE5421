@@ -9,6 +9,8 @@ class ContextFreeGrammar:
         self.P = P  # Dicionário de produções onde a chave é o não-terminal e o valor é uma lista de produções
         self.S = S  # Símbolo inicial
 
+        self.non_terminals_order = self.bfs_non_terminals()
+
     def __str__(self):
         # Formatar os conjuntos N, T e o símbolo inicial S
         N_str = "{" + ",".join(sorted(self.N)) + "}"
@@ -74,6 +76,7 @@ class ContextFreeGrammar:
             S_prime = self.S + "'"  # Novo símbolo inicial S'
             P_prime[S_prime] = [[self.S], []]
             N_prime = self.N | {S_prime}
+            self.non_terminals_order.append(S_prime)
         else:
             S_prime = self.S
             N_prime = self.N
@@ -82,6 +85,7 @@ class ContextFreeGrammar:
         self.N = N_prime
         self.P = P_prime
         self.S = S_prime
+
 
         return copy.deepcopy(self)
     
@@ -246,7 +250,7 @@ class ContextFreeGrammar:
         return order
         
     def eliminate_left_recursion(self):
-        non_terminals = self.bfs_non_terminals()
+        non_terminals = self.non_terminals_order
         for i in range(len(non_terminals)):
             Ai = non_terminals[i]
             for j in range(i):
