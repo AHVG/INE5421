@@ -49,6 +49,45 @@ class ContextFreeGrammar:
         self.P = P  # Produções
         self.S = S  # Símbolo inicial
 
+    def is_LL1(self):
+        no_left_recursion = self.check_left_recursion()
+        is_left_factored = self.check_left_factoring()
+        first_follow_disjoint = self.check_first_follow_disjoint()
+        return no_left_recursion and is_left_factored and first_follow_disjoint
+
+    def check_left_recursion(self):
+        for A in self.N:
+            for production_ in self.P.get(A, []):
+                if production_:
+                    production = production_[0]
+                    if production and production[0] == A:
+                        return False  # Recursão à esquerda encontrada
+        return True
+
+    def check_left_factoring(self):
+        for A in self.N:
+            prefixes = {}
+            for production_ in self.P.get(A, []):
+                if production_:
+                    first_symbol = ""
+                    for symbol in production_[0]:
+                        first_symbol += symbol
+                        if symbol in self.T or symbol in self.N:
+                            break
+                    if first_symbol in prefixes:
+                        return False  # Necessita fatoração
+                    prefixes[first_symbol] = True
+        return True
+
+    def check_first_follow_disjoint(self):
+        first = self.compute_first()
+        follow = self.compute_follow()
+        for A in self.N:
+            if '&' in first[A]:
+                if first[A].intersection(follow[A]):
+                    return False  # First(A) e Follow(A) não são disjuntos
+        return True
+
     def compute_first(self):
         first = {symbol: set() for symbol in self.N}  # Inicializa FIRST para cada não-terminal
         for terminal in self.T:
@@ -149,7 +188,6 @@ class ContextFreeGrammar:
 
     def compute_parsing_table(self):
         parsing_table = {}
-        is_ll1 = True
         first = self.compute_first()
         follow = self.compute_follow()
         for A in self.N:
@@ -157,8 +195,6 @@ class ContextFreeGrammar:
                 if production == ['&']:
                     for b in follow[A]:
                         key = (A, b)
-                        if key in parsing_table:
-                            is_ll1 = False
                         parsing_table[key] = production
                 else:
                     first_set = set()
@@ -176,24 +212,24 @@ class ContextFreeGrammar:
                             first_set.add('&')
                         for terminal in first_set - {'&'}:
                             key = (A, terminal)
-                            if key in parsing_table:
-                                is_ll1 = False
                             parsing_table[key] = production_
                         if '&' in first_set:
                             for b in follow[A]:
                                 key = (A, b)
-                                if key in parsing_table:
-                                    is_ll1 = False
                                 parsing_table[key] = production_
-        return parsing_table, is_ll1
+        return parsing_table
 
 def main():
     vpl_input = sys.argv[1]  # **Não remover esta linha**, ela recebe a string de entrada do VPL
     N, T, P, S, input_sentence = IOHandler.parse_input(vpl_input)  # Parsing da entrada
-    print(N, T, P, S, input_sentence)
-    cfg = ContextFreeGrammar(N, T, P, S)  
-    parsing_table, is_ll1 = cfg.compute_parsing_table()
-    output = IOHandler.format_output(N, S, T, parsing_table, is_ll1)
+    cfg = ContextFreeGrammar(N, T, P, S)
+    if not cfg.is_LL1():
+        print("A gramática não é LL1.")
+        return  
+    parsing_table = cfg.compute_parsing_table()
+    # word_is_valid = verify_word()
+    word_is_valid = True 
+    output = IOHandler.format_output(N, S, T, parsing_table, word_is_valid)
     print(output)  # Imprime o resultado
 
 if __name__ == "__main__":
