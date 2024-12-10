@@ -251,6 +251,8 @@ class ContextFreeGrammar:
         
     def eliminate_left_recursion(self):
         non_terminals = self.non_terminals_order
+        #non_terminals = self.bfs_non_terminals()
+        non_terminals = list(self.N)
         for i in range(len(non_terminals)):
             Ai = non_terminals[i]
             for j in range(i):

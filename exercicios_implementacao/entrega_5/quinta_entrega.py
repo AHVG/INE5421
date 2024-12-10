@@ -4,6 +4,8 @@ import re
 class IOHandler:
     @staticmethod
     def parse_input(vpl_input):
+        grammar_input, input_sentence = vpl_input.split('}; ')
+        grammar_input += '}'    
         # Expressão regular para encontrar os quatro conjuntos no formato "{...}"
         sets = re.findall(r"\{(.*?)\}", vpl_input)
         N = sets[0].split(',')          # Não-terminais
@@ -24,18 +26,20 @@ class IOHandler:
                     P[left].append(['&'])  
                 else:
                     P[left].append([right_side])  
-        return N, T, P, S
+        return N, T, P, S, input_sentence
     
     @staticmethod
-    def format_output(N, first, follow):
-        first_output = []
-        follow_output = []
-        for non_terminal in N:
-            first_set = ', '.join(sorted(first[non_terminal]))
-            follow_set = ', '.join(sorted(follow[non_terminal]))
-            first_output.append(f"First({non_terminal}) = {{{first_set}}}")
-            follow_output.append(f"Follow({non_terminal}) = {{{follow_set}}}")
-        output = '; '.join(first_output + follow_output)
+    def format_output(N, S, T, parsing_table, is_ll1):
+        table_entries = []
+        for nt in N:
+            for terminal in T + ['$']:
+                if (nt, terminal) in parsing_table:
+                    production = parsing_table[(nt, terminal)]
+                    production_str = ''.join(production) if production != ['&'] else '&'
+                    table_entries.append(f"[{nt},{terminal},{production_str}]")
+        N_str = '{' + ','.join(N) + '}'
+        T_str = '{' + ','.join(T + ['$']) + '}'
+        output = f"<<{N_str};{S};{T_str};{''.join(table_entries)}><{'sim' if is_ll1 else 'não'}>>"
         return output
 
 class ContextFreeGrammar:
@@ -65,7 +69,7 @@ class ContextFreeGrammar:
                             symbol_ = ""
                             for symbol in production:
                                 symbol_ += symbol
-                                if symbol_ in self.T or symbol_ in self.N:
+                                if symbol_ in self.T:
                                     before = len(first[X])
                                     first[X].update(first[symbol_] - {'&'})  # Adiciona FIRST do símbolo
                                     if '&' not in first[symbol_]:
@@ -76,6 +80,7 @@ class ContextFreeGrammar:
                                     if after > before:
                                         changed = True
                                     symbol_ = ""
+
         return first
 
     def compute_follow(self):
@@ -96,22 +101,12 @@ class ContextFreeGrammar:
                                 if beta:
                                     # Se beta não é vazio
                                     first_beta = set()
-                                    symbol_ = ""
                                     for symbol in beta:
-                                        symbol_ += symbol
-                                        if symbol_ in self.T or symbol_ in self.N:
-                                            first_beta.update(first[symbol_] - {'&'})
-                                            if '&' not in first[symbol_]:
-                                                break
-                                            symbol_ = ""
+                                        first_beta.update(first[symbol] - {'&'})
+                                        if '&' not in first[symbol]:
+                                            break
                                     else:
-                                        last_beta = ""
-                                        for i in range(1, len(beta) + 1):
-                                            last_beta = beta[-i:]
-                                            if last_beta in first.keys():
-                                                print(last_beta, self.T, self.N)
-                                                break
-                                        if '&' in first[last_beta]:
+                                        if '&' in first[beta[-1]]:
                                             first_beta.add('&')
                                     before = len(follow[B])
                                     follow[B].update(first_beta - {'&'})  # Atualiza FOLLOW(B)
@@ -119,19 +114,14 @@ class ContextFreeGrammar:
                                     if after > before:
                                         changed = True
                                     # Se FIRST(beta) contém epsilon
-                                    all_nullable = True
-                                    symbol_ = ""  
+                                    all_have_epsilon = True
                                     for symbol in beta:
-                                        symbol_ += symbol
-                                        if symbol_ in first.keys():
-                                            if '&' not in first[symbol_]:
-                                                all_nullable = False  
-                                                break
-                                            symbol_ = "" 
-                                    # Se FIRST(beta) contém epsilon
-                                    if all_nullable:
+                                        if '&' not in first[symbol]:
+                                            all_have_epsilon = False
+                                            break
+                                    if all_have_epsilon:
                                         before = len(follow[B])
-                                        follow[B].update(follow[A])  
+                                        follow[B].update(follow[A])  # Adiciona FOLLOW(A) a FOLLOW(B)
                                         after = len(follow[B])
                                         if after > before:
                                             changed = True
@@ -144,13 +134,47 @@ class ContextFreeGrammar:
                                         changed = True
         return follow
 
+    def compute_parsing_table(self):
+        parsing_table = {}
+        is_ll1 = True
+        first = self.compute_first()
+        follow = self.compute_follow()
+        for A in self.N:
+            for production in self.P[A]:
+                if production == ['&']:
+                    for b in follow[A]:
+                        key = (A, b)
+                        if key in parsing_table:
+                            is_ll1 = False
+                        parsing_table[key] = production
+                else:
+                    first_set = set()
+                    for symbol in production:
+                        first_set.update(first[symbol])
+                        if '&' not in first[symbol]:
+                            break
+                    else:
+                        first_set.add('&')
+                    for terminal in first_set - {'&'}:
+                        key = (A, terminal)
+                        if key in parsing_table:
+                            is_ll1 = False
+                        parsing_table[key] = production
+                    if '&' in first_set:
+                        for b in follow[A]:
+                            key = (A, b)
+                            if key in parsing_table:
+                                is_ll1 = False
+                            parsing_table[key] = production
+        return parsing_table, is_ll1
+
 def main():
     vpl_input = sys.argv[1]  # **Não remover esta linha**, ela recebe a string de entrada do VPL
-    N, T, P, S = IOHandler.parse_input(vpl_input)  # Parsing da entrada
+    N, T, P, S, input_sentence = IOHandler.parse_input(vpl_input)  # Parsing da entrada
+    print(N, T, P, S, input_sentence)
     cfg = ContextFreeGrammar(N, T, P, S)  
-    first = cfg.compute_first()  # Computa o conjunto FIRST
-    follow = cfg.compute_follow()  # Computa o conjunto FOLLOW
-    output = IOHandler.format_output(N, first, follow)  # Formata a saída
+    parsing_table, is_ll1 = cfg.compute_parsing_table()
+    output = IOHandler.format_output(N, S, T, parsing_table, is_ll1)
     print(output)  # Imprime o resultado
 
 if __name__ == "__main__":
