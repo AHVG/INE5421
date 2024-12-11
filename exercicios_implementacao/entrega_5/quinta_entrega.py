@@ -4,7 +4,7 @@ import re
 class IOHandler:
     @staticmethod
     def parse_input(vpl_input):
-        grammar_input, input_sentence = vpl_input.split('}; ')
+        grammar_input, input_sentence = vpl_input.split('};')
         grammar_input += '}'    
         # Expressão regular para encontrar os quatro conjuntos no formato "{...}"
         sets = re.findall(r"\{(.*?)\}", vpl_input)
@@ -223,13 +223,12 @@ def verify_sentence(input_sentence, parsing_table, S):
     stack = ['$', S]
     input_sentence += '$'
     parsing_table_symbols = [symbol for key in parsing_table.keys() for symbol in key]
-    print(parsing_table_symbols)
     symbol_tmp = ""
     for character in input_sentence:
         symbol_tmp += character
         if symbol_tmp in parsing_table_symbols:
             while True:
-                print(f"{stack} ---- {symbol_tmp}")
+                #print(f"{stack} ---- {symbol_tmp}")
                 if stack[-1] == symbol_tmp:
                     if stack[-1] == '$':
                         return True
