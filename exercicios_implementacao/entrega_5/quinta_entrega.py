@@ -219,6 +219,45 @@ class ContextFreeGrammar:
                                 parsing_table[key] = production_
         return parsing_table
 
+def verify_sentence(input_sentence, parsing_table, S):
+    stack = ['$', S]
+    input_sentence += '$'
+    parsing_table_symbols = [symbol for key in parsing_table.keys() for symbol in key]
+    print(parsing_table_symbols)
+    symbol_tmp = ""
+    for character in input_sentence:
+        symbol_tmp += character
+        if symbol_tmp in parsing_table_symbols:
+            while True:
+                print(f"{stack} ---- {symbol_tmp}")
+                if stack[-1] == symbol_tmp:
+                    if stack[-1] == '$':
+                        return True
+                    stack.pop()
+                    break
+
+                try:
+                    production = parsing_table[(stack[-1], symbol_tmp)]
+                except:
+                    return False
+
+                stack.pop()
+                if production == '&':
+                    break
+                else:
+                    symbol_tmp2 = ""
+                    for char in reversed(production):
+                        symbol_tmp2 += char
+                        symbol_in_table = ''.join(reversed(symbol_tmp2))
+                        if symbol_in_table in parsing_table_symbols:
+                            stack.append(symbol_in_table)
+                            symbol_tmp2 = ""
+            symbol_tmp = ""
+    return False
+    
+
+
+
 def main():
     vpl_input = sys.argv[1]  # **Não remover esta linha**, ela recebe a string de entrada do VPL
     N, T, P, S, input_sentence = IOHandler.parse_input(vpl_input)  # Parsing da entrada
@@ -227,9 +266,8 @@ def main():
         print("A gramática não é LL1.")
         return  
     parsing_table = cfg.compute_parsing_table()
-    # word_is_valid = verify_word()
-    word_is_valid = True 
-    output = IOHandler.format_output(N, S, T, parsing_table, word_is_valid)
+    sentence_is_valid = verify_sentence(input_sentence, parsing_table, S)
+    output = IOHandler.format_output(N, S, T, parsing_table, sentence_is_valid)
     print(output)  # Imprime o resultado
 
 if __name__ == "__main__":
